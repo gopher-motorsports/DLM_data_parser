@@ -92,6 +92,8 @@ S8 init_metadata_block(FILE_METADATA_t* metadat, const char* event_name, const c
     strncpy(metadat->session_str, session, sizeof(metadat->session_str));
     strncpy(metadat->long_comment_str, long_comment, sizeof(metadat->long_comment_str));
     strncpy(metadat->location_str, location, sizeof(metadat->location_str));
+
+    return 0;
 }
 
 
@@ -241,6 +243,8 @@ S8 write_id_file(START_OF_FILE_t* sof, FILE_METADATA_t* metadat, CHANNEL_DESC_LL
         }
         chan_ptr = chan_ptr->next;
     }
+
+    fclose(file);
 }
 
 

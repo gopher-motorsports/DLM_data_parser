@@ -16,6 +16,12 @@
 START_OF_FILE_t sof_data = {0};
 FILE_METADATA_t file_data = {0};
 
+const char session_def[] = "F1 Summer Testing";
+const char short_comment_def[] = "Tyler breaking something again";
+const char event_name_def[] = "Monaco Grand Prix";
+const char long_comment_def[] = "What the fuck did you just fucking say about me, you little bitch? I'll have you know I graduated top of my class in the Navy Seals, and I've been involved in numerous secret raids on Al-Quaeda, and I have over 300 confirmed kills. I am trained in gorilla warfare and I'm the top sniper in the entire US armed forces. You are nothing to me but just another target. I will wipe you the fuck out with precision the likes of which has never been seen before on this Earth, mark my fucking words.";
+const char location_def[] = "Spa";
+
 // the head node WILL NOT be written in memory so it do not count it
 CHANNEL_DESC_LL_NODE_t channel_head = 
 {
@@ -29,11 +35,34 @@ CHANNEL_DESC_LL_NODE_t channel_head =
 
 int main(int argc, char** argv)
 {
+    char* in_filename; // will be argv[1]
+    char out_filename[MAX_FILENAME_SIZE];
+    FILE* in_file;
+
+    // check to make sure a filename was inputted. If so create the output
+    // filname based on it
+    if (argc <= 1)
+    {
+        printf("Usage: ./ld_converter <input file>\n");
+        return -1;
+    }
+
+    in_filename = argv[1];
+    strncpy(out_filename, in_filename, MAX_FILENAME_SIZE);
+    strcat(out_filename, ".ld");
+
+    // open the input file
+    in_file = fopen(in_filename, "r");
+    if (!in_file)
+    {
+        printf("Failed to open file: %s\n", in_filename);
+        return -1;
+    }
     
     // fill in all of the names and metadata for the ld file. This includes the
     // date and time from the gdat file, as well as event name, session, comments,
     // and location
-    // TODO
+    if (build_ld_file_metadata(in_file, &sof_data, &file_data)) return -1;
 
     // read in the gdat file and store all the data in ram with some linked
     // lists for all of the data nodes. Do some fancy math to figure out what
@@ -45,25 +74,7 @@ int main(int argc, char** argv)
     // and data buffers. This will not fill in the pointers yet
     // TODO
 
-    // DEBUG filling in the sof and metadata
-    init_sof_block(&sof_data, 2022, 3, 30, 4, 20, 55, "SESSION", "SHORT COMMENT", "TEAM NAME");
-    init_metadata_block(&file_data, "EVENT NAME", "SESSION", "LONG COMMENT", "LOCATION");
-
-    // DEBUG add a couple of data points for testing
-    // Doing 100 data points at 10 Hz
-    U32 buf1[100];
-    U32 buf2[100];
-    U32 buf3[1000];
-    for (int c = 0; c < 100; c++)
-    {
-        buf1[c] = c;
-        buf2[c] = 100 - c;
-    }
-
-    for (int c = 0; c < 1000; c++) buf3[c] = c;
-    add_channel_to_list(&channel_head, 100, buf1, 10, 0, 1, 1, 1, "GPS Latitude", "GPSLat", "deg");
-    add_channel_to_list(&channel_head, 100, buf2, 10, 0, 1, 1, 1, "GPS Longitude", "GPSLong", "deg");
-    add_channel_to_list(&channel_head, 1000, buf3, 100, 0, 1, 1, 2, "tester variable 3", "test3", "unit3");
+    fclose(in_file);
 
     // Run the "linker". This will fill out correct file space for all of the different
     // blocks of data and makes sure they will be correctly pointed to in the file
@@ -71,8 +82,107 @@ int main(int argc, char** argv)
 
     // Open a new file with the correct name and begin writing all of the data to it.
     // Layout the file as planned after the linker was run
-    if (write_id_file(&sof_data, &file_data, &channel_head, "test_ld.ld")) return -1;
+    if (write_id_file(&sof_data, &file_data, &channel_head, out_filename)) return -1;
 
     printf("Conversion sucessful\n");
 }
 
+
+// build_ld_file_metadata
+//  Function to open the input file, read the date and time, and ask the 
+//  user for some metadata. Store all of this and add it the the ld file
+//  we are working with
+S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* metadat)
+{
+    U16 year;
+    U8 month, day, hour, min, sec;
+    U32 date_int = 0;
+    U32 time_int = 0;
+    char* char_ptr;
+    char temp_char[MAX_STR_SIZE];
+    char session[MAX_STR_SIZE];
+    char short_comment[MAX_STR_SIZE] ;
+    char team_name[] = "Gopher Motorsports";
+    char event_name[MAX_STR_SIZE];
+    char long_comment[STR_LEN_LONG];
+    char location[MAX_STR_SIZE];
+
+    // get the time things from the file. Get the integer number and parse
+    // from there
+    if (fscanf(file, "/dlm_data_%u_%u", &date_int, &time_int) == 0)
+    {
+        printf("Failed to get the metadata\n");
+        return -1;
+    }
+    // ints are in base10 format YYYYMMDD and HHMMSS
+    year = date_int / 10000;
+    month = (date_int / 100) % 100;
+    day = date_int % 100;
+    hour = time_int / 10000;
+    min = (time_int / 100) % 100;
+    sec = time_int % 100;
+
+    // ask for the other metadata things, most improtant first
+    printf("Fill int the following fields:\n");
+    printf("Venue: ");
+    fgets(location, sizeof(location), stdin);
+    printf("Event: ");
+    fgets(event_name, sizeof(event_name), stdin);
+    printf("Short Comment: ");
+    fgets(short_comment, sizeof(short_comment), stdin);
+    printf("Long Comment: ");
+    fgets(long_comment, sizeof(long_comment), stdin);
+    printf("Session: ");
+    fgets(session, sizeof(session), stdin);
+
+    // remove the extra shit at the end
+    cutoff_string(location, MAX_STR_SIZE);
+    cutoff_string(event_name, MAX_STR_SIZE);
+    cutoff_string(short_comment, MAX_STR_SIZE);
+    cutoff_string(long_comment, STR_LEN_LONG);
+    cutoff_string(session, MAX_STR_SIZE);
+
+    // check to make sure none of the strings are empty
+    if (strlen(location) == 0) strncpy(location, location_def, MAX_STR_SIZE);
+    if (strlen(event_name) == 0) strncpy(event_name, event_name_def, MAX_STR_SIZE);
+    if (strlen(short_comment) == 0) strncpy(short_comment, short_comment_def, MAX_STR_SIZE);
+    if (strlen(long_comment) == 0) strncpy(long_comment, long_comment_def, STR_LEN_LONG);
+    if (strlen(session) == 0) strncpy(session, session_def, MAX_STR_SIZE);
+
+    if (init_sof_block(sof, year, month, day, hour, min, sec, session, short_comment, team_name) ||
+        init_metadata_block(metadat, event_name, session, long_comment, location))
+    {
+        printf("Failed to init metadata\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+
+// import_gdat
+//  import the data in the gdat file. This will be stored as timestamped
+//  data nodes for now, and will be converted to evenly spaced samples later
+// TODO
+
+
+// build_ld_data_channels
+//  take all of the gdat data and create ld channels, also adding the data
+//  to buffers with interpolation to match the ld format better. When this
+//  conversion happens, print out logging data for the channels
+// TODO
+
+
+// cutoff_string
+//  add a null char to the first non-letter/number character in the string
+void cutoff_string(char* str, U32 length)
+{
+    char* temp_char = str;
+
+    // space is the lowest acceptable char, ~ is the highets
+    while((temp_char - str < length) && *temp_char >= ' ' && *temp_char <= '~')
+    {
+        temp_char++;
+    }
+    *temp_char = '\0';
+}

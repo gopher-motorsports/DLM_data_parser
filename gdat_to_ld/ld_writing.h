@@ -5,17 +5,8 @@
 #ifndef LD_WRITING_H
 #define LD_WRITING_H
 
-#include <stdint.h>
 
-// Better types
-typedef uint8_t  U8 ;
-typedef uint16_t U16;
-typedef uint32_t U32;
-typedef uint64_t U64;
-typedef int8_t   S8 ;
-typedef int16_t  S16;
-typedef int32_t  S32;
-typedef int64_t  S64;
+#include "types.h"
 
 
 // important defines for the Id file
@@ -145,4 +136,4 @@ void metadata_to_bytes(FILE_METADATA_t* metadat, U8* bytes);
 void channel_desc_to_bytes(CHANNEL_DESC_t* chan_desc, U8* bytes);
 
 
-#endif LD_WRITING_H
+#endif // LD_WRITING_H
