@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <float.h>
 
 
 // define everything that is neede in static memory
@@ -30,6 +31,12 @@ CHANNEL_DESC_LL_NODE_t channel_head =
     .data_buffer = NULL,
     .prev = NULL,
     .next = NULL,
+};
+
+GDAT_CHANNEL_LL_NODE_t gdat_data_head = 
+{
+    .channel = {0},
+    .next = NULL
 };
 
 
@@ -62,26 +69,31 @@ int main(int argc, char** argv)
     // fill in all of the names and metadata for the ld file. This includes the
     // date and time from the gdat file, as well as event name, session, comments,
     // and location
+    printf("Getting the metadata...\n");
     if (build_ld_file_metadata(in_file, &sof_data, &file_data)) return -1;
 
     // read in the gdat file and store all the data in ram with some linked
-    // lists for all of the data nodes. Do some fancy math to figure out what
-    // the offset, scaler, divisor, and base10_shift should be. Also find the
-    // logging frequency
-    // TODO
-
-    // take the data from gdat and use it to fill in all of the ld data headers
-    // and data buffers. This will not fill in the pointers yet
-    // TODO
+    // lists for all of the data nodes
+    printf("Importing data from the file...\n");
+    if (import_gdat(in_file, &gdat_data_head));
 
     fclose(in_file);
 
+    // take the data from gdat and use it to fill in all of the ld data headers
+    // and data buffers. This will not fill in the file pointers yet. Do some
+    // fancy math to figure out what the offset, scaler, divisor, and base10_shift
+    // should be. Also find the logging frequency and give stats about the channel
+    printf("Converting data to ld file format...\n");
+    if (build_ld_data_channels(&gdat_data_head, &channel_head, true));
+
     // Run the "linker". This will fill out correct file space for all of the different
     // blocks of data and makes sure they will be correctly pointed to in the file
+    printf("Linking file pointers...\n");
     if (link_id_file(&sof_data, &file_data, &channel_head)) return -1;
 
     // Open a new file with the correct name and begin writing all of the data to it.
     // Layout the file as planned after the linker was run
+    printf("Writing ld data...\n");
     if (write_id_file(&sof_data, &file_data, &channel_head, out_filename)) return -1;
 
     printf("Conversion sucessful\n");
@@ -162,15 +174,268 @@ S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* met
 
 // import_gdat
 //  import the data in the gdat file. This will be stored as timestamped
-//  data nodes for now, and will be converted to evenly spaced samples later
-// TODO
+//  data nodes for now, and will be converted to evenly spaced samples later. This
+//  will ensure the data is in order when it is done
+S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head)
+{
+    unsigned char datapoint[TOTAL_SIZE] = {0};
+    U16 param = 0;
+    U32 timestamp = 0;
+    DPF_CONVERTER data;
+    GDAT_CHANNEL_LL_NODE_t* curr_node = head->next;
+    char temp_str[MAX_STR_SIZE] = "";
+
+    data.u64 = 0;
+
+    // place the file pointer in the correct spot (second line)
+    fseek(file, 0, SEEK_SET);
+    if (fgets(temp_str, MAX_STR_SIZE, file) == 0)
+    {
+        printf("Failed a read\n");
+        return -1;
+    }
+
+    // take in the data point by point
+    while (fread(datapoint, TOTAL_SIZE, sizeof(char), file))
+    {
+        // reset the integers
+        param = 0;
+        timestamp = 0;
+        data.u64 = 0;
+
+        // get the param_id
+        param |= ((U16)(datapoint[1]));
+        param |= ((U16)(datapoint[0]) << 8);
+
+        // get the timestamp
+        timestamp |= ((U32)(datapoint[5]));
+        timestamp |= ((U32)(datapoint[4]) << (8*1));
+        timestamp |= ((U32)(datapoint[3]) << (8*2));
+        timestamp |= ((U32)(datapoint[2]) << (8*3));
+
+        // get the datapoint
+        data.u64 |= ((U64)(datapoint[13]));
+        data.u64 |= ((U64)(datapoint[12]) << (8*1));
+        data.u64 |= ((U64)(datapoint[11]) << (8*2));
+        data.u64 |= ((U64)(datapoint[10]) << (8*3));
+        data.u64 |= ((U64)(datapoint[9]) << (8*4));
+        data.u64 |= ((U64)(datapoint[8]) << (8*5));
+        data.u64 |= ((U64)(datapoint[7]) << (8*6));
+        data.u64 |= ((U64)(datapoint[6]) << (8*7));
+
+        // find the correct parameter in the LL by the ID
+        curr_node = head->next;
+        while (curr_node != NULL)
+        {
+            if (curr_node->channel.gcan_id == param)
+            {
+                break;
+            }
+
+            curr_node = curr_node->next;
+        }
+
+        // if the correct param was not found, make a new node with this ID
+        if (curr_node == NULL)
+        {
+            curr_node = (GDAT_CHANNEL_LL_NODE_t*)malloc(sizeof(GDAT_CHANNEL_LL_NODE_t));
+            if (!curr_node)
+            {
+                printf("Failed a malloc\n");
+                return -1;
+            }
+
+            curr_node->next = head->next;
+            head->next = curr_node;
+
+            curr_node->channel.gcan_id = param;
+            curr_node->channel.num_data_points = 0;
+            curr_node->channel.array_size = STARTING_NUM_POINTS;
+
+            // give the starting amount of memory for the data arrays
+            curr_node->channel.timestamps = (U32*)malloc(STARTING_NUM_POINTS*sizeof(U32));
+            curr_node->channel.data_points = (float*)malloc(STARTING_NUM_POINTS*sizeof(float));
+            if (!curr_node->channel.timestamps || !curr_node->channel.data_points)
+            {
+                printf("Failed a malloc\n");
+                return -1;
+            }
+        }
+
+        // if the array is not big enough to handle this
+        if (curr_node->channel.num_data_points == curr_node->channel.array_size)
+        {
+            curr_node->channel.array_size = curr_node->channel.array_size * 2;
+            curr_node->channel.timestamps = (U32*)realloc(curr_node->channel.timestamps,
+                                                          curr_node->channel.array_size * sizeof(U32));
+            curr_node->channel.data_points = (float*)realloc(curr_node->channel.data_points,
+                                                             curr_node->channel.array_size * sizeof(float));
+
+            if (!curr_node->channel.timestamps || !curr_node->channel.data_points)
+            {
+                printf("Failed a realloc\n");
+                return -1;
+            }
+        }
+
+        // inset the node into the correct spot into the array based on the timestamp
+        U32* curr_ts = curr_node->channel.timestamps + curr_node->channel.num_data_points; // start at the end + 1
+        float* curr_dat = curr_node->channel.data_points + curr_node->channel.num_data_points;
+        while (curr_ts > curr_node->channel.timestamps && timestamp <= *(curr_ts - 1))
+        {
+            // the timestamp arrays must move down
+            *curr_ts = *(curr_ts - 1);
+            *curr_dat = *(curr_dat - 1);
+
+            curr_ts--;
+            curr_dat--;
+        }
+
+        *curr_ts = timestamp;
+        *curr_dat = (float)data.d;
+
+        curr_node->channel.num_data_points++;
+    }
+
+    return 0;
+}
 
 
 // build_ld_data_channels
 //  take all of the gdat data and create ld channels, also adding the data
 //  to buffers with interpolation to match the ld format better. When this
 //  conversion happens, print out logging data for the channels
-// TODO
+S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NODE_t* ld_head,
+                          bool print_chan_stats)
+{
+    GDAT_CHANNEL_LL_NODE_t* curr_gdat = gdat_head->next;
+    U32 min_time_delta = UINT32_MAX;
+    U32 max_time_delta = 0;
+    U32 frequency_hz = 0;
+    float data_min = FLT_MAX;
+    float data_max = FLT_MIN;
+
+    float offset_float;
+    float scaler_float;
+    S16 offset_s16;
+    S16 scaler_s16;
+    S16 divisor_s16;
+    S16 base10_shift_s16;
+
+    U32* ld_buf;
+    U32 ld_data_points;
+
+    // the channel cant hold strings this long, but strncpy will append
+    char chan_name[MAX_STR_SIZE];
+    char name_shrt[MAX_STR_SIZE];
+    char chan_unit[MAX_STR_SIZE];
+
+    while (curr_gdat != NULL)
+    {
+        U32* curr_ts = curr_gdat->channel.timestamps;
+        float* curr_data = curr_gdat->channel.data_points;
+
+        // calculate the minimum and maximum of the channel and scale it correctly to a U32
+        // with scaling to match the ld format. Also calculate the minimum time between points
+        // that is not 0, this will be used for the frequency. Log the maximum time delta for
+        // debugging reasons
+        while (curr_ts - curr_gdat->channel.timestamps < curr_gdat->channel.num_data_points)
+        {
+            if (*curr_data > data_max) data_max = *curr_data;
+            if (*curr_data < data_min) data_min = *curr_data;
+
+            // ignore the first datapoint for time delta calculation
+            U32 this_delta;
+            if (curr_ts != curr_gdat->channel.timestamps)
+            {
+                this_delta = *curr_ts - *(curr_ts - 1);
+                if (this_delta > max_time_delta) max_time_delta = this_delta;
+                if (this_delta < min_time_delta && this_delta > 0) min_time_delta = this_delta; // ignore deltas of 0, these shouldnt exist so it could be a bug
+            }
+
+            curr_ts++;
+            curr_data++;
+        }
+
+        // limit the freq to 1 - 1000. If the data is less complete than this (in reality logging
+        // the freq is less than 1Hz), just interpolate it in because it probably does not matter
+        frequency_hz = 1000 / (min_time_delta);
+        frequency_hz = MIN(frequency_hz, 1000);
+        frequency_hz = MAX(frequency_hz, 1);
+
+        // get good scalers for this data. This is acomplished by first scaling the data to 8*10^x
+        // (0.008, 0.8, 80, 8000, ect) base on what is closest, then get a good *10^x exponent to
+        // scale the data to 8000000 (approx 2^23, the size of float mantissa). This should garuntee
+        // precision is kept as long as the numbers are not too large
+        float scaling_value; // scale using the largest ABS
+        // TODO
+        S16 exp;
+        for (exp = INT16_MIN; exp < INT16_MAX; exp++)
+        {
+            // see if 8*10^exp is the right representation
+            if (TODO)
+            {
+                // if it is, find the scaler to get the data from a range maxing at 8*10^exp
+
+                // set the base10 shifter to range the data to a max of 8*10^6 (approx 2^23)
+            }
+        }
+        if (exp == INT16_MAX)
+        {
+            printf("Param %u has data that cannot be represented\n", curr_gdat->channel.gcan_id);
+            continue;
+        }
+
+        // take the float scaler and turn it into a fraction (s16/s16). It is ok if the fraction
+        // is not perfect, data will still be correct but with slightly less accuracy
+
+        // create a new buffer with enought points to fill between time=0 to time=max
+        // at a frequency that is close to the max frequency the data was logged
+        ld_data_points = curr_gdat->channel.timestamps[curr_gdat->channel.num_data_points - 1] / min_time_delta;
+        ld_buf = (U32*)malloc(sizeof(U32) * ld_data_points);
+        if (!ld_buf)
+        {
+            printf("Malloc failed\n");
+            return -1;
+        }
+
+        // fill each of the points of the new data buffer, using linear interpolation
+        // when the time point does not exacly exist. Also use the offset and scaler
+        // to convert the floating point data to an int32
+
+        // get the rest of the channel metadata from the GCAN param data
+        // TODO right now just use IDs
+        sprintf(chan_name, "GCAN PARAM %u", curr_gdat->channel.gcan_id);
+        sprintf(name_shrt, "%u", curr_gdat->channel.gcan_id);
+        sprintf(chan_unit, "%u_unit", curr_gdat->channel.gcan_id);
+
+        // create the ld channel!
+        if (add_channel_to_list(ld_head, ld_data_points, ld_buf, frequency_hz, offset_s16, scaler_s16,
+                                divisor_s16, base10_shift_s16, chan_name, name_shrt, chan_unit)) return -1;
+
+        // print the stats about the channel if needed
+        if (print_chan_stats)
+        {
+            printf("CHANNEL ID: %u\n", curr_gdat->channel.gcan_id);
+            printf("\tdata max: %f\n", data_max);
+            printf("\tdata min: %f\n", data_min);
+            printf("\tdelta_t max (ms): %u\n", max_time_delta);
+            printf("\tdelta_t mix (ms): %u\n", min_time_delta);
+            printf("\toffset: %d\n", offset_s16);
+            printf("\tscaler: %d\n", scaler_s16);
+            printf("\tdivisor: %d\n", divisor_s16);
+            printf("\tbase10: %d\n", base10_shift_s16);
+            printf("\tld data points: %u\n", ld_data_points);
+            printf("\tname: %s\n", chan_name);
+            printf("\tshort name: %s\n", name_shrt);
+            printf("\tunit: %s\n", chan_unit);
+        }
+
+        curr_gdat = curr_gdat->next;
+    }
+
+    return 0;
+}
 
 
 // cutoff_string
@@ -186,3 +451,4 @@ void cutoff_string(char* str, U32 length)
     }
     *temp_char = '\0';
 }
+

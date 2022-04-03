@@ -9,7 +9,7 @@
 #include "types.h"
 
 
-// important defines for the Id file
+// important defines for the ld file
 #define EDL_VER_STR_FLOC 0x40
 #define EDL_VERSION_STRING {0x00, 0x00, 0x40, 0x42, 0x0F, 0x00, 0x7B, 0x52, 0x00, 0x00, 0x41, 0x44, 0x4C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x02, 0x80, 0x00, 0x02, 0x00, 0x00, 0x00, 0x14, 0x00, 0x05, 0x00}
 #define MAGIC_STR_FLOC 0x5DE
@@ -31,7 +31,7 @@ typedef enum
     s32_data = 0x00040005,
 } DATAPOINT_SIZE_t;
 
-// structs for the different blocks of I2 data
+// structs for the different blocks of ld data
 
 // Start of file block: This should be 0x6B4 bytes long, but also includes a
 // in-file pointer to itself that is hard coded in and a lot of padding zeros to
