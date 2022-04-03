@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
+#include <math.h>
 
 
 // define everything that is neede in static memory
@@ -315,7 +316,6 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
     float data_min = FLT_MAX;
     float data_max = FLT_MIN;
 
-    float offset_float;
     float scaler_float;
     S16 offset_s16;
     S16 scaler_s16;
@@ -367,27 +367,34 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         // (0.008, 0.8, 80, 8000, ect) base on what is closest, then get a good *10^x exponent to
         // scale the data to 8000000 (approx 2^23, the size of float mantissa). This should garuntee
         // precision is kept as long as the numbers are not too large
-        float scaling_value; // scale using the largest ABS
-        // TODO
+        float scaling_value = MAX(fabs(data_max), fabs(data_min)); // scale using the largest ABS
+
         S16 exp;
-        for (exp = INT16_MIN; exp < INT16_MAX; exp++)
+        bool done = false;
+        for (exp = -37; exp < 37 && !done; exp++)
         {
             // see if 8*10^exp is the right representation
-            if (TODO)
+            if (scaling_value >= 8.0*pow(10, exp) && scaling_value < 8.0*pow(10, exp+1))
             {
                 // if it is, find the scaler to get the data from a range maxing at 8*10^exp
+                scaler_float = (8.0*pow(10, exp)) / (scaling_value);
 
                 // set the base10 shifter to range the data to a max of 8*10^6 (approx 2^23)
+                base10_shift_s16 = (6 - exp);
+                done = true;
             }
         }
-        if (exp == INT16_MAX)
+        if (!done)
         {
             printf("Param %u has data that cannot be represented\n", curr_gdat->channel.gcan_id);
+            curr_gdat = curr_gdat->next;
             continue;
         }
 
         // take the float scaler and turn it into a fraction (s16/s16). It is ok if the fraction
         // is not perfect, data will still be correct but with slightly less accuracy
+        offset_s16 = 0;
+        convert_float_to_frac(scaler_float, &scaler_s16, &divisor_s16);
 
         // create a new buffer with enought points to fill between time=0 to time=max
         // at a frequency that is close to the max frequency the data was logged
@@ -403,11 +410,37 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         // when the time point does not exacly exist. Also use the offset and scaler
         // to convert the floating point data to an int32
 
+        // DEBUG just convert the data for now
+        curr_gdat->channel.num_data_points = 100;
+        ld_data_points = curr_gdat->channel.num_data_points;
+        U32* curr_u32 = ld_buf;
+        curr_data = curr_gdat->channel.data_points;
+        while (curr_data - curr_gdat->channel.data_points < curr_gdat->channel.num_data_points)
+        {
+            //*curr_u32 = ((float)divisor_s16 / scaler_s16) * *curr_data * pow(10, base10_shift_s16);
+            *curr_u32 = curr_data - curr_gdat->channel.data_points;
+
+            printf("float value: %f\n", *curr_data);
+            printf("u32 value: %u\n", *curr_u32);
+
+            curr_data++;
+            curr_u32++;
+        }
+
+        // DEBUG
+        offset_s16 = 0;
+        scaler_s16 = 1;
+        divisor_s16 = 1;
+        base10_shift_s16 = 0;
+        sprintf(chan_name, "GCAN PARAM %u", curr_gdat->channel.gcan_id);
+        sprintf(name_shrt, "tst%u", curr_gdat->channel.gcan_id);
+        sprintf(chan_unit, "unit_%u", curr_gdat->channel.gcan_id);
+
         // get the rest of the channel metadata from the GCAN param data
         // TODO right now just use IDs
-        sprintf(chan_name, "GCAN PARAM %u", curr_gdat->channel.gcan_id);
-        sprintf(name_shrt, "%u", curr_gdat->channel.gcan_id);
-        sprintf(chan_unit, "%u_unit", curr_gdat->channel.gcan_id);
+        //sprintf(chan_name, "GCAN PARAM %u", curr_gdat->channel.gcan_id);
+        //sprintf(name_shrt, "%u", curr_gdat->channel.gcan_id);
+        //sprintf(chan_unit, "%u_unit", curr_gdat->channel.gcan_id);
 
         // create the ld channel!
         if (add_channel_to_list(ld_head, ld_data_points, ld_buf, frequency_hz, offset_s16, scaler_s16,
@@ -431,6 +464,9 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             printf("\tunit: %s\n", chan_unit);
         }
 
+        // DEBUG just one channel
+        return 0;
+
         curr_gdat = curr_gdat->next;
     }
 
@@ -452,3 +488,54 @@ void cutoff_string(char* str, U32 length)
     *temp_char = '\0';
 }
 
+
+// convert_float_to_frac
+//  Convert a floating point number to a numerator and denomerator. returning
+//  the error in the final meaurment. Returning -1.0 means the algorithm failed
+double convert_float_to_frac(double dlb, S16* num, S16* den)
+{
+    double error;
+
+    long m[2][2];
+    double x, startx;
+    long maxden;
+    long ai;
+
+    startx = x = dlb;
+    maxden = INT16_MAX;
+
+    // initialize matrix
+    m[0][0] = m[1][1] = 1;
+    m[0][1] = m[1][0] = 0;
+
+    // loop finding terms until denom gets too big
+    while (m[1][0] * ( ai = (long)x ) + m[1][1] <= maxden)
+    {
+        long t;
+        t = m[0][0] * ai + m[0][1];
+        m[0][1] = m[0][0];
+        m[0][0] = t;
+        t = m[1][0] * ai + m[1][1];
+        m[1][1] = m[1][0];
+        m[1][0] = t;
+        if(x==(double)ai) break;     // AF: division by zero
+        x = 1/(x - (double) ai);
+        if(x>(double)0x7FFFFFFF) break;  // AF: representation failure
+    } 
+
+    // now remaining x is between 0 and 1/ai
+    // approx as either 0 or 1/m where m is max that will fit in maxden
+    // first try zero
+    error = startx - ((double) m[0][0] / (double) m[1][0]);
+
+    // now try other possibility
+    ai = (maxden - m[1][1]) / m[1][0];
+    m[0][0] = m[0][0] * ai + m[0][1];
+    m[1][0] = m[1][0] * ai + m[1][1];
+    error = startx - ((double) m[0][0] / (double) m[1][0]);
+
+    *num = (S16)m[0][0];
+    *den = (S16)m[1][0];
+
+    return error;
+}

@@ -198,7 +198,7 @@ S8 write_id_file(START_OF_FILE_t* sof, FILE_METADATA_t* metadat, CHANNEL_DESC_LL
 
     // if needed, convert all of the data to little endian
     // Linux with AMD: Already little endian
-    // WSL and intel: TODO
+    // WSL and intel: Already little endian
 
     // fill in the byte strings for the sof and metadata
     sof_to_bytes(sof, sof_str);

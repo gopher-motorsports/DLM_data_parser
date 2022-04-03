@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=
+CFLAGS=-lm
 DBFLAGS=-g
 
 all: gdat_to_ld.c ld_writing.o gdat_to_ld.h ld_writing.h types.h
