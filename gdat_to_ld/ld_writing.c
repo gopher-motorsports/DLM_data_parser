@@ -53,6 +53,10 @@ S8 add_channel_to_list(CHANNEL_DESC_LL_NODE_t* chan_head, U32 num_data_points, U
 
     // the unknown U16 cannot be 0
     new_chan->channel_desc.unknown = 0xAA55;
+    for (int c = 0; c < sizeof(new_chan->channel_desc.zeroes); c++)
+    {
+        new_chan->channel_desc.zeroes[c] = 0;
+    }
 
     return 0;
 }

@@ -56,6 +56,7 @@ typedef struct
     U8  session_str[0x40];          // stores the session string. The extra can just be zeros. I dont know if this is what is used or the session later on in the next block
     U8  short_comment_str[0x40];    // stores the short comment string. The extra can just be zeros
     U8  team_name_str[0x20];        // stores the team name string. The extra can just be zeros
+    // not sure how long team_name_str can be
 } START_OF_FILE_t;
 
 

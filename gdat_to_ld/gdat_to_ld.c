@@ -80,6 +80,24 @@ int main(int argc, char** argv)
 
     fclose(in_file);
 
+    /*
+    // DEBUG print all of the channels
+    GDAT_CHANNEL_LL_NODE_t* curr_node = gdat_data_head.next;
+    while (curr_node != NULL)
+    {
+        printf("Channel: %u\n", curr_node->channel.gcan_id);
+        U32* ts = curr_node->channel.timestamps;
+        float* data = curr_node->channel.data_points;
+        while(ts - curr_node->channel.timestamps < curr_node->channel.num_data_points)
+        {
+            printf("\t%u\t%f\n", *ts, *data);
+            ts++;
+            data++;
+        }
+        curr_node = curr_node->next;
+    }
+    */
+
     // take the data from gdat and use it to fill in all of the ld data headers
     // and data buffers. This will not fill in the file pointers yet. Do some
     // fancy math to figure out what the offset, scaler, divisor, and base10_shift
@@ -115,7 +133,7 @@ S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* met
     char temp_char[MAX_STR_SIZE];
     char session[MAX_STR_SIZE];
     char short_comment[MAX_STR_SIZE] ;
-    char team_name[] = "Gopher Motorsports";
+    char team_name[] = "UofM FSAE";
     char event_name[MAX_STR_SIZE];
     char long_comment[STR_LEN_LONG];
     char location[MAX_STR_SIZE];
@@ -312,6 +330,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
     GDAT_CHANNEL_LL_NODE_t* curr_gdat = gdat_head->next;
     U32 min_time_delta = UINT32_MAX;
     U32 max_time_delta = 0;
+    U32 max_time = 0;
     U32 frequency_hz = 0;
     float data_min = FLT_MAX;
     float data_max = FLT_MIN;
@@ -334,6 +353,11 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
     {
         U32* curr_ts = curr_gdat->channel.timestamps;
         float* curr_data = curr_gdat->channel.data_points;
+        max_time = 0;
+        min_time_delta = UINT32_MAX;
+        max_time_delta = 0;
+        data_min = FLT_MAX;
+        data_max = FLT_MIN;
 
         // calculate the minimum and maximum of the channel and scale it correctly to a U32
         // with scaling to match the ld format. Also calculate the minimum time between points
@@ -356,6 +380,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             curr_ts++;
             curr_data++;
         }
+        max_time = *(curr_ts - 1);
 
         // limit the freq to 1 - 1000. If the data is less complete than this (in reality logging
         // the freq is less than 1Hz), just interpolate it in because it probably does not matter
@@ -406,41 +431,61 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             return -1;
         }
 
+        divisor_s16 >>= 4;
+        scaler_s16 >>= 4;
+
         // fill each of the points of the new data buffer, using linear interpolation
         // when the time point does not exacly exist. Also use the offset and scaler
         // to convert the floating point data to an int32
-
-        // DEBUG just convert the data for now
-        curr_gdat->channel.num_data_points = 100;
-        ld_data_points = curr_gdat->channel.num_data_points;
-        U32* curr_u32 = ld_buf;
+        U32 rolling_ts = 0;
+        U32* curr_ld_buf = ld_buf;
+        curr_ts = curr_gdat->channel.timestamps;
         curr_data = curr_gdat->channel.data_points;
-        while (curr_data - curr_gdat->channel.data_points < curr_gdat->channel.num_data_points)
+        while (curr_ld_buf - ld_buf < ld_data_points)
         {
-            //*curr_u32 = ((float)divisor_s16 / scaler_s16) * *curr_data * pow(10, base10_shift_s16);
-            *curr_u32 = curr_data - curr_gdat->channel.data_points;
+            if (curr_ts == curr_gdat->channel.timestamps)
+            {
+                // before the fisrt timestamp
+                if (rolling_ts > *curr_ts)
+                {
+                    // we are past the first timestamp. Move on by running the loop again
+                    // without increasing the rolling timestamp
+                    curr_ts++;
+                    curr_data++;
+                }
+                else
+                {
+                    // we are before the first timestamp, dont interpolate
+                    *curr_ld_buf = (U32)(((float)divisor_s16 / scaler_s16) * *curr_data * pow(10, base10_shift_s16));
 
-            printf("float value: %f\n", *curr_data);
-            printf("u32 value: %u\n", *curr_u32);
+                    curr_ld_buf++;
+                    rolling_ts += min_time_delta;
+                }
+            }
+            else
+            {
+                // in the middle of the data, keep moving until the ts before is less and
+                // the ts after is greater. We should never move beyond the last ts. We dont
+                // want to interpolate as it should be clear when there is no data for a specific
+                // range
+                while (rolling_ts > *(curr_ts + 1))
+                {
+                    curr_ts++;
+                    curr_data++;
+                }
 
-            curr_data++;
-            curr_u32++;
+                *curr_ld_buf = (U32)(((float)divisor_s16 / scaler_s16) * *curr_data * pow(10, base10_shift_s16));
+
+                curr_ld_buf++;
+                rolling_ts += min_time_delta;
+            }
         }
-
-        // DEBUG
-        offset_s16 = 0;
-        scaler_s16 = 1;
-        divisor_s16 = 1;
-        base10_shift_s16 = 0;
-        sprintf(chan_name, "GCAN PARAM %u", curr_gdat->channel.gcan_id);
-        sprintf(name_shrt, "tst%u", curr_gdat->channel.gcan_id);
-        sprintf(chan_unit, "unit_%u", curr_gdat->channel.gcan_id);
 
         // get the rest of the channel metadata from the GCAN param data
         // TODO right now just use IDs
-        //sprintf(chan_name, "GCAN PARAM %u", curr_gdat->channel.gcan_id);
-        //sprintf(name_shrt, "%u", curr_gdat->channel.gcan_id);
-        //sprintf(chan_unit, "%u_unit", curr_gdat->channel.gcan_id);
+        sprintf(chan_name, "GCAN PARAM %u", curr_gdat->channel.gcan_id);
+        sprintf(name_shrt, "%u", curr_gdat->channel.gcan_id);
+        sprintf(chan_unit, "%u_unit", curr_gdat->channel.gcan_id);
 
         // create the ld channel!
         if (add_channel_to_list(ld_head, ld_data_points, ld_buf, frequency_hz, offset_s16, scaler_s16,
@@ -452,6 +497,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             printf("CHANNEL ID: %u\n", curr_gdat->channel.gcan_id);
             printf("\tdata max: %f\n", data_max);
             printf("\tdata min: %f\n", data_min);
+            printf("\tmax time: %u\n", max_time);
             printf("\tdelta_t max (ms): %u\n", max_time_delta);
             printf("\tdelta_t mix (ms): %u\n", min_time_delta);
             printf("\toffset: %d\n", offset_s16);
@@ -463,9 +509,6 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             printf("\tshort name: %s\n", name_shrt);
             printf("\tunit: %s\n", chan_unit);
         }
-
-        // DEBUG just one channel
-        return 0;
 
         curr_gdat = curr_gdat->next;
     }
