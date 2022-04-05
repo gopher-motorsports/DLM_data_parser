@@ -7,6 +7,7 @@
 
 #include "gdat_to_ld.h"
 #include "ld_writing.h"
+#include "../../gophercan-lib/GopherCAN_names.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -465,16 +466,21 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             else
             {
                 // in the middle of the data, keep moving until the ts before is less and
-                // the ts after is greater. We should never move beyond the last ts. We dont
-                // want to interpolate as it should be clear when there is no data for a specific
-                // range
+                // the ts after is greater. We should never move beyond the last ts.
+
                 while (rolling_ts > *(curr_ts + 1))
                 {
                     curr_ts++;
                     curr_data++;
                 }
 
-                *curr_ld_buf = (U32)(((float)divisor_s16 / scaler_s16) * *curr_data * pow(10, base10_shift_s16));
+                // interpolate the data between the point before and point after
+                U32 time_dist_tot = *(curr_ts + 1) - *curr_ts;
+                float interp_data = (*(curr_data + 1) * (rolling_ts - *curr_ts)) +
+                                     (*curr_data * (*(curr_ts + 1) - rolling_ts));
+                interp_data /= time_dist_tot;
+
+                *curr_ld_buf = (U32)(((float)divisor_s16 / scaler_s16) * interp_data * pow(10, base10_shift_s16));
 
                 curr_ld_buf++;
                 rolling_ts += min_time_delta;
@@ -482,10 +488,9 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         }
 
         // get the rest of the channel metadata from the GCAN param data
-        // TODO right now just use IDs
-        sprintf(chan_name, "GCAN PARAM %u", curr_gdat->channel.gcan_id);
-        sprintf(name_shrt, "%u", curr_gdat->channel.gcan_id);
-        sprintf(chan_unit, "%u_unit", curr_gdat->channel.gcan_id);
+        sprintf(chan_name, "%s", name_strings[curr_gdat->channel.gcan_id]);
+        sprintf(name_shrt, "gcan%u", curr_gdat->channel.gcan_id);
+        sprintf(chan_unit, "%s", unit_strings[curr_gdat->channel.gcan_id]);
 
         // create the ld channel!
         if (add_channel_to_list(ld_head, ld_data_points, ld_buf, frequency_hz, offset_s16, scaler_s16,

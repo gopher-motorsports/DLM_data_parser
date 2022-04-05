@@ -10,9 +10,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-// TODO add gopherCAN ID stuff so we can convert the numbers to the real
-// gopherCAN names
-
 #define MAX_FILENAME_SIZE 255
 #define MAX_STR_SIZE 255
 
