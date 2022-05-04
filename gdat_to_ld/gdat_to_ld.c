@@ -198,14 +198,16 @@ S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* met
 //  will ensure the data is in order when it is done
 S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head)
 {
-    unsigned char datapoint[TOTAL_SIZE] = {0};
+    unsigned char temp_char;
+    bool esc_next = false;
+    unsigned char byte_seq[(TOTAL_SIZE+1)*2] = {0};
+    uint32_t pack_size = 0;
+    U32 bad_packets = 0;
+    U32 total_packets = 0;
     U16 param = 0;
     U32 timestamp = 0;
-    DPF_CONVERTER data;
-    GDAT_CHANNEL_LL_NODE_t* curr_node = head->next;
+    double data;
     char temp_str[MAX_STR_SIZE] = "";
-
-    data.u64 = 0;
 
     // place the file pointer in the correct spot (second line)
     fseek(file, 0, SEEK_SET);
@@ -215,108 +217,233 @@ S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head)
         return -1;
     }
 
+    // find the first start byte
+    while (1)
+    {
+        if (fread(&temp_char, 1, sizeof(char), file) == 0)
+        {
+            return -1;
+        }
+
+        if (temp_char == PACK_START) break;
+    }
+
     // take in the data point by point
-    while (fread(datapoint, TOTAL_SIZE, sizeof(char), file))
+    while (fread(&temp_char, 1, sizeof(char), file))
     {
         // reset the integers
         param = 0;
         timestamp = 0;
-        data.u64 = 0;
+        data = 0;
 
-        // TODO use the new data storage method
-
-        // get the param_id
-        param |= ((U16)(datapoint[1]));
-        param |= ((U16)(datapoint[0]) << 8);
-
-        // get the timestamp
-        timestamp |= ((U32)(datapoint[5]));
-        timestamp |= ((U32)(datapoint[4]) << (8*1));
-        timestamp |= ((U32)(datapoint[3]) << (8*2));
-        timestamp |= ((U32)(datapoint[2]) << (8*3));
-
-        // get the datapoint
-        data.u64 |= ((U64)(datapoint[13]));
-        data.u64 |= ((U64)(datapoint[12]) << (8*1));
-        data.u64 |= ((U64)(datapoint[11]) << (8*2));
-        data.u64 |= ((U64)(datapoint[10]) << (8*3));
-        data.u64 |= ((U64)(datapoint[9]) << (8*4));
-        data.u64 |= ((U64)(datapoint[8]) << (8*5));
-        data.u64 |= ((U64)(datapoint[7]) << (8*6));
-        data.u64 |= ((U64)(datapoint[6]) << (8*7));
-
-        // find the correct parameter in the LL by the ID
-        curr_node = head->next;
-        while (curr_node != NULL)
+        switch (temp_char)
         {
-            if (curr_node->channel.gcan_id == param)
+        case PACK_START:
+            total_packets++;
+            // convert this string into variables and add to the CSV
+            if (read_data_point(byte_seq, pack_size, &timestamp, &param, &data)) 
             {
+                // failed to read the last packet
+                bad_packets++;
+                pack_size = 0;
                 break;
             }
+            if (add_datapoint(timestamp, param, data, head)) return -1;
+            pack_size = 0;
+            break;
 
-            curr_node = curr_node->next;
-        }
-
-        // if the correct param was not found, make a new node with this ID
-        if (curr_node == NULL)
-        {
-            curr_node = (GDAT_CHANNEL_LL_NODE_t*)malloc(sizeof(GDAT_CHANNEL_LL_NODE_t));
-            if (!curr_node)
+        case ESCAPE_CHAR:
+            // make sure to escape the next byte. Dont increase the size
+            esc_next = true;
+            break;
+        
+        default:
+            // append this byte to the current string
+            if (esc_next)
             {
-                printf("Failed a malloc\n");
-                return -1;
+                temp_char ^= ESCAPE_XOR;
+                esc_next = false;
             }
-
-            curr_node->next = head->next;
-            head->next = curr_node;
-
-            curr_node->channel.gcan_id = param;
-            curr_node->channel.num_data_points = 0;
-            curr_node->channel.array_size = STARTING_NUM_POINTS;
-
-            // give the starting amount of memory for the data arrays
-            curr_node->channel.timestamps = (U32*)malloc(STARTING_NUM_POINTS*sizeof(U32));
-            curr_node->channel.data_points = (float*)malloc(STARTING_NUM_POINTS*sizeof(float));
-            if (!curr_node->channel.timestamps || !curr_node->channel.data_points)
-            {
-                printf("Failed a malloc\n");
-                return -1;
-            }
+            byte_seq[pack_size] = temp_char;
+            pack_size++;
+            break;
         }
+    }
 
-        // if the array is not big enough to handle this
-        if (curr_node->channel.num_data_points == curr_node->channel.array_size)
+    // print some data about the file
+    printf("Conversion complete\n");
+    printf("Total packets: %u\n", total_packets);
+    printf("Bad packets:   %u\n", bad_packets);
+
+    return 0;
+}
+
+
+// add_datapoint
+//  Adds a datapoint to the arrays of datapoints
+S8 add_datapoint(U32 timestamp, U16 param, double data, GDAT_CHANNEL_LL_NODE_t* head)
+{
+    GDAT_CHANNEL_LL_NODE_t* curr_node = head->next;
+
+    // find the correct parameter in the LL by the ID
+    curr_node = head->next;
+    while (curr_node != NULL)
+    {
+        if (curr_node->channel.gcan_id == param)
         {
-            curr_node->channel.array_size = curr_node->channel.array_size * 2;
-            curr_node->channel.timestamps = (U32*)realloc(curr_node->channel.timestamps,
-                                                          curr_node->channel.array_size * sizeof(U32));
-            curr_node->channel.data_points = (float*)realloc(curr_node->channel.data_points,
-                                                             curr_node->channel.array_size * sizeof(float));
-
-            if (!curr_node->channel.timestamps || !curr_node->channel.data_points)
-            {
-                printf("Failed a realloc\n");
-                return -1;
-            }
+            break;
         }
 
-        // inset the node into the correct spot into the array based on the timestamp
-        U32* curr_ts = curr_node->channel.timestamps + curr_node->channel.num_data_points; // start at the end + 1
-        float* curr_dat = curr_node->channel.data_points + curr_node->channel.num_data_points;
-        while (curr_ts > curr_node->channel.timestamps && timestamp <= *(curr_ts - 1))
+        curr_node = curr_node->next;
+    }
+
+    // if the correct param was not found, make a new node with this ID
+    if (curr_node == NULL)
+    {
+        curr_node = (GDAT_CHANNEL_LL_NODE_t*)malloc(sizeof(GDAT_CHANNEL_LL_NODE_t));
+        if (!curr_node)
         {
-            // the timestamp arrays must move down
-            *curr_ts = *(curr_ts - 1);
-            *curr_dat = *(curr_dat - 1);
-
-            curr_ts--;
-            curr_dat--;
+            printf("Failed a malloc\n");
+            return -1;
         }
 
-        *curr_ts = timestamp;
-        *curr_dat = (float)data.d;
+        curr_node->next = head->next;
+        head->next = curr_node;
 
-        curr_node->channel.num_data_points++;
+        curr_node->channel.gcan_id = param;
+        curr_node->channel.num_data_points = 0;
+        curr_node->channel.array_size = STARTING_NUM_POINTS;
+
+        // give the starting amount of memory for the data arrays
+        curr_node->channel.timestamps = (U32*)malloc(STARTING_NUM_POINTS*sizeof(U32));
+        curr_node->channel.data_points = (float*)malloc(STARTING_NUM_POINTS*sizeof(float));
+        if (!curr_node->channel.timestamps || !curr_node->channel.data_points)
+        {
+            printf("Failed a malloc\n");
+            return -1;
+        }
+    }
+
+    // if the array is not big enough to handle this
+    if (curr_node->channel.num_data_points == curr_node->channel.array_size)
+    {
+        curr_node->channel.array_size = curr_node->channel.array_size * 2;
+        curr_node->channel.timestamps = (U32*)realloc(curr_node->channel.timestamps,
+                                                        curr_node->channel.array_size * sizeof(U32));
+        curr_node->channel.data_points = (float*)realloc(curr_node->channel.data_points,
+                                                            curr_node->channel.array_size * sizeof(float));
+
+        if (!curr_node->channel.timestamps || !curr_node->channel.data_points)
+        {
+            printf("Failed a realloc\n");
+            return -1;
+        }
+    }
+
+    // inset the node into the correct spot into the array based on the timestamp
+    U32* curr_ts = curr_node->channel.timestamps + curr_node->channel.num_data_points; // start at the end + 1
+    float* curr_dat = curr_node->channel.data_points + curr_node->channel.num_data_points;
+    while (curr_ts > curr_node->channel.timestamps && timestamp <= *(curr_ts - 1))
+    {
+        // the timestamp arrays must move down
+        *curr_ts = *(curr_ts - 1);
+        *curr_dat = *(curr_dat - 1);
+
+        curr_ts--;
+        curr_dat--;
+    }
+
+    *curr_ts = timestamp;
+    *curr_dat = (float)data;
+
+    curr_node->channel.num_data_points++;
+
+    return 0;
+}
+
+
+// read_data_point
+//  takes a string and size, fills in the pointers passed in
+int32_t read_data_point(char* str, uint32_t size,
+                        uint32_t* timestamp, uint16_t* param, double* data)
+{
+    DPF_CONVERTER read_data;
+    uint32_t target_size;
+    // reset the integers
+    *param = 0;
+    *timestamp = 0;
+    *data = 0;
+    read_data.u64 = 0;
+
+    // make sure the size is reasonable
+    if (size <= PARAM_ID_SIZE + TIMESTAMP_SIZE) return -1;
+
+    // read the param and timestamp as normal
+    *timestamp |= ((uint32_t)(str[3])) & 0xff;
+    *timestamp |= ((uint32_t)(str[2]) << (8*1)) & 0xff00;
+    *timestamp |= ((uint32_t)(str[1]) << (8*2)) & 0xff0000;
+    *timestamp |= ((uint32_t)(str[0]) << (8*3)) & 0xff000000;
+    *param |= ((uint16_t)(str[5])) & 0xff;
+    *param |= ((uint16_t)(str[4]) << 8) & 0xff00;
+
+    // read the data into the uint64_t based on the size
+    uint32_t byte_pos = size - 1;
+    for (uint32_t c = 0; c < size - (PARAM_ID_SIZE + TIMESTAMP_SIZE); c++)
+    {
+        read_data.u64 |= (((uint64_t)(str[byte_pos]) & 0xff) << (8*c));
+        byte_pos--;
+    }
+
+    // convert from the correct data type to a double
+    if (*param >= NUM_OF_PARAMETERS) return -1;
+    switch (param_types[*param])
+    {
+    case UINT_8:
+        target_size = sizeof(uint8_t);
+        *data = (uint8_t)read_data.u64;
+        break;
+    case UINT_16:
+        target_size = sizeof(uint16_t);
+        *data = (uint16_t)read_data.u64;
+        break;
+    case UINT_32:
+        target_size = sizeof(uint32_t);
+        *data = (uint32_t)read_data.u64;
+        break;
+    case UINT_64:
+        target_size = sizeof(uint64_t);
+        *data = (uint64_t)read_data.u64;
+        break;
+    case SINT_8:
+        target_size = sizeof(int8_t);
+        *data = (int8_t)read_data.u64;
+        break;
+    case SINT_16:
+        target_size = sizeof(int16_t);
+        *data = (int16_t)read_data.u64;
+        break;
+    case SINT_32:
+        target_size = sizeof(int32_t);
+        *data = (int32_t)read_data.u64;
+        break;
+    case SINT_64:
+        target_size = sizeof(int64_t);
+        *data = (int64_t)read_data.u64;
+        break;
+    case FLOAT:
+        target_size = sizeof(float);
+        FLT_CONVERTER flt_con;
+        flt_con.u32 = read_data.u64;
+        *data = flt_con.f;
+        break;
+    default:
+        return -1;
+        break;
+    }
+
+    if (size - (PARAM_ID_SIZE + TIMESTAMP_SIZE) != target_size)
+    {
+        return -1;
     }
 
     return 0;

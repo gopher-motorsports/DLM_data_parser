@@ -99,12 +99,8 @@ int convert_gdat_to_csv(FILE* gdat, FILE* csv)
     // big loop for reading the file
     while (1)
     {
-        // attempt to read. If there is no more to be read, it will return 0 and leave the loop
-        if (fread(&temp_char, 1, sizeof(char), gdat) == 0)
-        {
-            fprintf(csv, "%u, %u, %f\n", param, timestamp, data);
-            break;
-        }
+        // attempt to read. If there is no more to be read, it will leave the loop
+        if (fread(&temp_char, 1, sizeof(char), gdat) == 0) break;
 
         switch (temp_char)
         {
