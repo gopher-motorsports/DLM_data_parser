@@ -223,6 +223,8 @@ S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head)
         timestamp = 0;
         data.u64 = 0;
 
+        // TODO use the new data storage method
+
         // get the param_id
         param |= ((U16)(datapoint[1]));
         param |= ((U16)(datapoint[0]) << 8);

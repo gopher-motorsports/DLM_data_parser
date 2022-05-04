@@ -1,11 +1,13 @@
 // dlm_data_parser.c
-//  TODO DOCS
+//  Program to parse .gdat files into human readable CSVs. These files
+//  might be very large, so you have been warned
 
 
 // includes
 #include "dlm_data_parser.h"
 #include <string.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 
 // main
@@ -62,12 +64,16 @@ int main(int argc, char* argv[])
 //  data points are 16bits of the param ID, 32bits
 int convert_gdat_to_csv(FILE* gdat, FILE* csv)
 {
-    unsigned char datapoint[TOTAL_SIZE] = {0};
+    char temp_char;
+    bool esc_next = false;
+    unsigned char byte_seq[(TOTAL_SIZE+1)*2] = {0};
     unsigned char metadata[METADATA_MAX_SIZE] = {0};
+    uint32_t pack_size = 0;
     uint16_t param = 0;
     uint32_t timestamp = 0;
-    DPF_CONVERTER data;
-    data.u64 = 0;
+    double data;
+    uint32_t bad_packets = 0;
+    uint32_t total_packets = 0;
 
     // copy the file header/metadata from the gdat to the csv
     if (fgets(metadata, METADATA_MAX_SIZE, gdat) == 0)
@@ -78,48 +84,117 @@ int convert_gdat_to_csv(FILE* gdat, FILE* csv)
     fprintf(csv, "%s", metadata);
     fprintf(csv, "Parameter ID, Timestamp, Data\n");
 
+    // find the first start byte
+    while (1)
+    {
+        if (fread(&temp_char, 1, sizeof(char), gdat) == 0)
+        {
+            return CONVERSION_FAILED;
+        }
+
+        if (temp_char == PACK_START) break;
+    }
+
     // big loop for reading the file
     while (1)
     {
         // attempt to read. If there is no more to be read, it will return 0 and leave the loop
-        if (fread(datapoint, TOTAL_SIZE, sizeof(char), gdat) == 0)
+        if (fread(&temp_char, 1, sizeof(char), gdat) == 0)
         {
+            fprintf(csv, "%u, %u, %f\n", param, timestamp, data);
             return PARSER_SUCCESS;
         }
 
-        // reset the integers
-        param = 0;
-        timestamp = 0;
-        data.u64 = 0;
+        switch (temp_char)
+        {
+        case PACK_START:
+            total_packets++;
+            // convert this string into variables and add to the CSV
+            if (read_data_point(byte_seq, pack_size, &timestamp, &param, &data)) 
+            {
+                // failed to read the last packet
+                bad_packets++;
+                fprintf(csv, "BAD PACKET: ");
+                for (int k = 0; k < pack_size; k++)
+                {
+                    fprintf(csv, "%.2X ", (uint8_t)byte_seq[k]);
+                }
+                fprintf(csv, "\n");
+                pack_size = 0;
+                break;
+            }
+            fprintf(csv, "%u, %u, %f\n", param, timestamp, data);
+            pack_size = 0;
+            break;
 
-        // get the param_id
-        param |= ((uint16_t)(datapoint[1]));
-        param |= ((uint16_t)(datapoint[0]) << 8);
-
-        // get the timestamp
-        timestamp |= ((uint32_t)(datapoint[5]));
-        timestamp |= ((uint32_t)(datapoint[4]) << (8*1));
-        timestamp |= ((uint32_t)(datapoint[3]) << (8*2));
-        timestamp |= ((uint32_t)(datapoint[2]) << (8*3));
-
-        // get the datapoint
-        data.u64 |= ((uint64_t)(datapoint[13]));
-        data.u64 |= ((uint64_t)(datapoint[12]) << (8*1));
-        data.u64 |= ((uint64_t)(datapoint[11]) << (8*2));
-        data.u64 |= ((uint64_t)(datapoint[10]) << (8*3));
-        data.u64 |= ((uint64_t)(datapoint[9]) << (8*4));
-        data.u64 |= ((uint64_t)(datapoint[8]) << (8*5));
-        data.u64 |= ((uint64_t)(datapoint[7]) << (8*6));
-        data.u64 |= ((uint64_t)(datapoint[6]) << (8*7));
-
-        // write all that data into the CSV
-        fprintf(csv, "%u, %u, %f\n", param, timestamp, data.d);
-
-        // print out what we added to the file
-        //printf("%u, %u, %f\n", param, timestamp, data.d);
+        case ESCAPE_CHAR:
+            // make sure to escape the next byte. Dont increase the size
+            esc_next = true;
+            break;
+        
+        default:
+            // append this byte to the current string
+            if (esc_next)
+            {
+                temp_char ^= ESCAPE_XOR;
+                esc_next = false;
+            }
+            byte_seq[pack_size] = temp_char;
+            pack_size++;
+            break;
+        }
     }
+
+    printf("Conversion complete\n");
+    printf("Total packets: %u\n", total_packets);
+    printf("Bad packets:   %u\n", bad_packets);
 
     return PARSER_SUCCESS;
 }
+
+
+// takes a string and size, fills in the pointers passed in
+int32_t read_data_point(char* str, uint32_t size,
+                        uint32_t* timestamp, uint16_t* param, double* data)
+{
+    DPF_CONVERTER read_data;
+    // reset the integers
+    *param = 0;
+    *timestamp = 0;
+    *data = 0;
+    read_data.u64 = 0;
+
+    // make sure the size is reasonable
+    if (size <= PARAM_ID_SIZE + TIMESTAMP_SIZE) return PACKET_SIZE_ERR;
+
+    // read the param and timestamp as normal
+    *timestamp |= ((uint32_t)(str[3])) & 0xff;
+    *timestamp |= ((uint32_t)(str[2]) << (8*1)) & 0xff00;
+    *timestamp |= ((uint32_t)(str[1]) << (8*2)) & 0xff0000;
+    *timestamp |= ((uint32_t)(str[0]) << (8*3)) & 0xff000000;
+    *param |= ((uint16_t)(str[5])) & 0xff;
+    *param |= ((uint16_t)(str[4]) << 8) & 0xff00;
+
+    // read the data into the U64 based on the size
+    uint32_t byte_pos = size - 1;
+    for (uint32_t c = 0; c < size - (PARAM_ID_SIZE + TIMESTAMP_SIZE); c++)
+    {
+        read_data.u64 |= (((uint64_t)(str[byte_pos]) & 0xff) << (8*c));
+        byte_pos--;
+    }
+
+    // convert from the correct data type to a double
+    // TODO this is only a float for now
+    if (size - (PARAM_ID_SIZE + TIMESTAMP_SIZE) != 4)
+    {
+        return PACKET_SIZE_ERR;
+    }
+    FLT_CONVERTER flt_con;
+    flt_con.u32 = read_data.u64;
+    *data = flt_con.f;
+
+    return PARSER_SUCCESS;
+}
+
 
 // End of dlm_data_parser.c
