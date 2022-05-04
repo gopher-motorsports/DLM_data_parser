@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "../../gophercan-lib/GopherCAN_names.h"
 
 
 // main
@@ -102,7 +103,7 @@ int convert_gdat_to_csv(FILE* gdat, FILE* csv)
         if (fread(&temp_char, 1, sizeof(char), gdat) == 0)
         {
             fprintf(csv, "%u, %u, %f\n", param, timestamp, data);
-            return PARSER_SUCCESS;
+            break;
         }
 
         switch (temp_char)
@@ -148,7 +149,6 @@ int convert_gdat_to_csv(FILE* gdat, FILE* csv)
     printf("Conversion complete\n");
     printf("Total packets: %u\n", total_packets);
     printf("Bad packets:   %u\n", bad_packets);
-
     return PARSER_SUCCESS;
 }
 
@@ -158,6 +158,7 @@ int32_t read_data_point(char* str, uint32_t size,
                         uint32_t* timestamp, uint16_t* param, double* data)
 {
     DPF_CONVERTER read_data;
+    uint32_t target_size;
     // reset the integers
     *param = 0;
     *timestamp = 0;
@@ -175,7 +176,7 @@ int32_t read_data_point(char* str, uint32_t size,
     *param |= ((uint16_t)(str[5])) & 0xff;
     *param |= ((uint16_t)(str[4]) << 8) & 0xff00;
 
-    // read the data into the U64 based on the size
+    // read the data into the uint64_t based on the size
     uint32_t byte_pos = size - 1;
     for (uint32_t c = 0; c < size - (PARAM_ID_SIZE + TIMESTAMP_SIZE); c++)
     {
@@ -184,14 +185,56 @@ int32_t read_data_point(char* str, uint32_t size,
     }
 
     // convert from the correct data type to a double
-    // TODO this is only a float for now
-    if (size - (PARAM_ID_SIZE + TIMESTAMP_SIZE) != 4)
+    if (*param >= NUM_OF_PARAMETERS) return PARAM_OUT_OF_RANGE;
+    switch (param_types[*param])
+    {
+    case UINT_8:
+        target_size = sizeof(uint8_t);
+        *data = (uint8_t)read_data.u64;
+        break;
+    case UINT_16:
+        target_size = sizeof(uint16_t);
+        *data = (uint16_t)read_data.u64;
+        break;
+    case UINT_32:
+        target_size = sizeof(uint32_t);
+        *data = (uint32_t)read_data.u64;
+        break;
+    case UINT_64:
+        target_size = sizeof(uint64_t);
+        *data = (uint64_t)read_data.u64;
+        break;
+    case SINT_8:
+        target_size = sizeof(int8_t);
+        *data = (int8_t)read_data.u64;
+        break;
+    case SINT_16:
+        target_size = sizeof(int16_t);
+        *data = (int16_t)read_data.u64;
+        break;
+    case SINT_32:
+        target_size = sizeof(int32_t);
+        *data = (int32_t)read_data.u64;
+        break;
+    case SINT_64:
+        target_size = sizeof(int64_t);
+        *data = (int64_t)read_data.u64;
+        break;
+    case FLOAT:
+        target_size = sizeof(float);
+        FLT_CONVERTER flt_con;
+        flt_con.u32 = read_data.u64;
+        *data = flt_con.f;
+        break;
+    default:
+        return SIZE_NOT_FOUND;
+        break;
+    }
+
+    if (size - (PARAM_ID_SIZE + TIMESTAMP_SIZE) != target_size)
     {
         return PACKET_SIZE_ERR;
     }
-    FLT_CONVERTER flt_con;
-    flt_con.u32 = read_data.u64;
-    *data = flt_con.f;
 
     return PARSER_SUCCESS;
 }

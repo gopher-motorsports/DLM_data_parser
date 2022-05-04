@@ -39,6 +39,8 @@ typedef union
 #define CONVERSION_FAILED -3
 #define BAD_METADATA -4
 #define PACKET_SIZE_ERR -5
+#define PARAM_OUT_OF_RANGE -6
+#define SIZE_NOT_FOUND -7
 
 // string char defines
 #define PACK_START 0x7E
