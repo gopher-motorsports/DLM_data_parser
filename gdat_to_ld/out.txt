@@ -1,0 +1,752 @@
+Getting the metadata...
+Fill int the following fields:
+Venue: Event: Short Comment: Long Comment: Session: Importing data from the file...
+Conversion complete
+Total packets: 53541
+Bad packets:   82
+Converting data to ld file format...
+CHANNEL ID: 35
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28455
+	delta_t max (ms): 202
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 711
+	name: GPS Longitude (ECU)
+	short name: gcan35
+	unit: deg
+CHANNEL ID: 159
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28492
+	delta_t max (ms): 71
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2849
+	name: Anti stall active
+	short name: gcan159
+	unit: bool
+CHANNEL ID: 157
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28492
+	delta_t max (ms): 71
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2849
+	name: True if we are using the clutch during a shift
+	short name: gcan157
+	unit: bool
+CHANNEL ID: 156
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28492
+	delta_t max (ms): 71
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2849
+	name: True if we are Currently blipping the ECU
+	short name: gcan156
+	unit: bool
+CHANNEL ID: 152
+	data max: 5000.000000
+	data min: 0.000000
+	max time: 28492
+	delta_t max (ms): 82
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: 327
+	divisor: 2046
+	base10: 4
+	ld data points: 2849
+	name: Transmission speed, measured at the clutch
+	short name: gcan152
+	unit: rpm
+CHANNEL ID: 150
+	data max: 12.569372
+	data min: 0.000000
+	max time: 28492
+	delta_t max (ms): 82
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: 347
+	divisor: 545
+	base10: 6
+	ld data points: 2849
+	name: Clutch Position
+	short name: gcan150
+	unit: mm
+CHANNEL ID: 149
+	data max: 15.711716
+	data min: 0.000000
+	max time: 28492
+	delta_t max (ms): 82
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: 1021
+	divisor: 2006
+	base10: 6
+	ld data points: 2849
+	name: Shifter Position
+	short name: gcan149
+	unit: mm
+CHANNEL ID: 34
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: GPS Latitude (ECU)
+	short name: gcan34
+	unit: deg
+CHANNEL ID: 33
+	data max: 49.899998
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 323
+	divisor: 2019
+	base10: 6
+	ld data points: 712
+	name: 5V Eng Voltage (ECU)
+	short name: gcan33
+	unit: percent
+CHANNEL ID: 32
+	data max: 50.200001
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 325
+	divisor: 2043
+	base10: 6
+	ld data points: 712
+	name: 5V Aux Voltage (ECU)
+	short name: gcan32
+	unit: percent
+CHANNEL ID: 31
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Warning Light Duty Cycle (ECU)
+	short name: gcan31
+	unit: percent
+CHANNEL ID: 30
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Brake Light Duty Cycle (ECU)
+	short name: gcan30
+	unit: percent
+CHANNEL ID: 29
+	data max: 15.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 1091
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Water Pump Duty Cycle (ECU)
+	short name: gcan29
+	unit: percent
+CHANNEL ID: 28
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Fan Oil Duty Cycle (ECU)
+	short name: gcan28
+	unit: percent
+CHANNEL ID: 27
+	data max: 50.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 327
+	divisor: 2046
+	base10: 6
+	ld data points: 712
+	name: Fan Duty Cycle (ECU)
+	short name: gcan27
+	unit: percent
+CHANNEL ID: 26
+	data max: 65440.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 247
+	divisor: 2025
+	base10: 3
+	ld data points: 712
+	name: ETC Duty Cycle (ECU)
+	short name: gcan26
+	unit: percent
+CHANNEL ID: 25
+	data max: 275.300018
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 573
+	divisor: 1975
+	base10: 5
+	ld data points: 712
+	name: Brake Pressure Front (ECU)
+	short name: gcan25
+	unit: psi
+CHANNEL ID: 24
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Throttle Position Required (ECU)
+	short name: gcan24
+	unit: percent
+CHANNEL ID: 23
+	data max: 300.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 545
+	divisor: 2047
+	base10: 5
+	ld data points: 712
+	name: Fuel Pressure (ECU)
+	short name: gcan23
+	unit: kPa
+CHANNEL ID: 22
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Oil Temp (ECU)
+	short name: gcan22
+	unit: C
+CHANNEL ID: 21
+	data max: 94.800003
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 1726
+	divisor: 2046
+	base10: 5
+	ld data points: 712
+	name: Oil Pressure (ECU)
+	short name: gcan21
+	unit: kPa
+CHANNEL ID: 20
+	data max: 47.200001
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 346
+	divisor: 2046
+	base10: 6
+	ld data points: 712
+	name: Ignition Advance (ECU)
+	short name: gcan20
+	unit: dbtdc
+CHANNEL ID: 19
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Fuel Cut Level (ECU)
+	short name: gcan19
+	unit: percent
+CHANNEL ID: 18
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Manifold Air Pressure (ECU)
+	short name: gcan18
+	unit: kPa
+CHANNEL ID: 143
+	data max: 0.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 680
+	name: Downshift button from steering wheel
+	short name: gcan143
+	unit: bool
+CHANNEL ID: 17
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Pedal Position 2 (ECU)
+	short name: gcan17
+	unit: percent
+CHANNEL ID: 16
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Pedal Position 1 (ECU)
+	short name: gcan16
+	unit: percent
+CHANNEL ID: 15
+	data max: 7.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 233
+	divisor: 2046
+	base10: 7
+	ld data points: 712
+	name: Throttle Position 2 (ECU)
+	short name: gcan15
+	unit: percent
+CHANNEL ID: 14
+	data max: 7.200000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 227
+	divisor: 2047
+	base10: 7
+	ld data points: 712
+	name: Throttle Position 1 (ECU)
+	short name: gcan14
+	unit: percent
+CHANNEL ID: 9
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28488
+	delta_t max (ms): 343
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2848
+	name: Ignition Cut Level (ECU)
+	short name: gcan9
+	unit: kPa
+CHANNEL ID: 8
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28488
+	delta_t max (ms): 343
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2848
+	name: Wheel Speed Rear Left (ECU)
+	short name: gcan8
+	unit: kph
+CHANNEL ID: 7
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28488
+	delta_t max (ms): 343
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2848
+	name: Wheel Speed Rear Left (ECU)
+	short name: gcan7
+	unit: kph
+CHANNEL ID: 6
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28488
+	delta_t max (ms): 343
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2848
+	name: Wheel Speed Front Right (ECU)
+	short name: gcan6
+	unit: kph
+CHANNEL ID: 13
+	data max: 0.950000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 1724
+	divisor: 2047
+	base10: 7
+	ld data points: 712
+	name: Lambda 1 Ratio (ECU)
+	short name: gcan13
+	unit: LA
+CHANNEL ID: 12
+	data max: 20.000000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 819
+	divisor: 2047
+	base10: 6
+	ld data points: 712
+	name: Inlet Air Temp (ECU)
+	short name: gcan12
+	unit: C
+CHANNEL ID: 11
+	data max: 74.700005
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 214
+	divisor: 2005
+	base10: 6
+	ld data points: 712
+	name: Engine Temp (ECU)
+	short name: gcan11
+	unit: C
+CHANNEL ID: 10
+	data max: 14.230000
+	data min: 0.000000
+	max time: 28495
+	delta_t max (ms): 361
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 1142
+	divisor: 2033
+	base10: 6
+	ld data points: 712
+	name: Battery Voltage (ECU)
+	short name: gcan10
+	unit: C
+CHANNEL ID: 5
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28488
+	delta_t max (ms): 353
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2848
+	name: Wheel Speed Front Left (ECU)
+	short name: gcan5
+	unit: rpm
+CHANNEL ID: 4
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28488
+	delta_t max (ms): 343
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2848
+	name: Engine RPM Target (ECU)
+	short name: gcan4
+	unit: rpm
+CHANNEL ID: 3
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28488
+	delta_t max (ms): 343
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2848
+	name: Wheel Slip (ECU)
+	short name: gcan3
+	unit: kph
+CHANNEL ID: 2
+	data max: 24.600000
+	data min: 0.000000
+	max time: 28488
+	delta_t max (ms): 343
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: 665
+	divisor: 2047
+	base10: 6
+	ld data points: 2848
+	name: Wheel Slip (ECU)
+	short name: gcan2
+	unit: kph
+CHANNEL ID: 1
+	data max: 0.000000
+	data min: 0.000000
+	max time: 28488
+	delta_t max (ms): 343
+	delta_t mix (ms): 10
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 2848
+	name: Engine RPM (ECU)
+	short name: gcan1
+	unit: rpm
+CHANNEL ID: 158
+	data max: 0.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 680
+	name: True if a shift is successful
+	short name: gcan158
+	unit: bool
+CHANNEL ID: 155
+	data max: 1.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 1638
+	divisor: 2047
+	base10: 7
+	ld data points: 680
+	name: True if we are Currently moving
+	short name: gcan155
+	unit: bool
+CHANNEL ID: 154
+	data max: 0.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 680
+	name: Target Gear During a shift
+	short name: gcan154
+	unit: gear
+CHANNEL ID: 153
+	data max: 6.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 273
+	divisor: 2047
+	base10: 7
+	ld data points: 680
+	name: Current Gear
+	short name: gcan153
+	unit: gear
+CHANNEL ID: 151
+	data max: 0.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 680
+	name: Target RPM during a shift
+	short name: gcan151
+	unit: rpm
+CHANNEL ID: 148
+	data max: 0.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 680
+	name: Neutral signal
+	short name: gcan148
+	unit: bool
+CHANNEL ID: 147
+	data max: 0.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 680
+	name: Aux3 button from steering wheel
+	short name: gcan147
+	unit: bool
+CHANNEL ID: 146
+	data max: 0.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 680
+	name: Aux2 button from steering wheel
+	short name: gcan146
+	unit: bool
+CHANNEL ID: 145
+	data max: 1.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: 1638
+	divisor: 2047
+	base10: 7
+	ld data points: 680
+	name: DRS button from steering wheel
+	short name: gcan145
+	unit: bool
+CHANNEL ID: 144
+	data max: 0.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 680
+	name: Clutch button from steering wheel
+	short name: gcan144
+	unit: bool
+CHANNEL ID: 142
+	data max: 0.000000
+	data min: 0.000000
+	max time: 27217
+	delta_t max (ms): 6014
+	delta_t mix (ms): 40
+	offset: 0
+	scaler: -1
+	divisor: 2047
+	base10: 6
+	ld data points: 680
+	name: Upshift button from steering wheel
+	short name: gcan142
+	unit: bool
+Linking file pointers...
+Writing ld data...
+failed to open file

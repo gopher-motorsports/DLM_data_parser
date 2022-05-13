@@ -528,8 +528,19 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         bool done = false;
         for (exp = -37; exp < 37 && !done; exp++)
         {
+            // if the two data points are equal, just set the scaler to 1
+            if (data_max - data_min <= 0.0001)
+            {
+                exp = 0;
+                scaling_value = 1;
+                scaler_float = (8.0*pow(10, exp)) / (scaling_value);
+
+                // set the base10 shifter to range the data to a max of 8*10^6 (approx 2^23)
+                base10_shift_s16 = (6 - exp);
+                done = true;
+            }
             // see if 8*10^exp is the right representation
-            if (scaling_value >= 8.0*pow(10, exp) && scaling_value < 8.0*pow(10, exp+1))
+            else if (scaling_value >= 8.0*pow(10, exp) && scaling_value < 8.0*pow(10, exp+1))
             {
                 // if it is, find the scaler to get the data from a range maxing at 8*10^exp
                 scaler_float = (8.0*pow(10, exp)) / (scaling_value);
@@ -542,6 +553,8 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         if (!done)
         {
             printf("Param %u has data that cannot be represented\n", curr_gdat->channel.gcan_id);
+            printf("Data min: %f\n", data_min);
+            printf("Data max: %f\n", data_max);
             curr_gdat = curr_gdat->next;
             continue;
         }
