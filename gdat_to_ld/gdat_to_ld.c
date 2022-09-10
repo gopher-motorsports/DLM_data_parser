@@ -514,9 +514,15 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
 
         // limit the freq to 1 - 1000. If the data is less complete than this (in reality logging
         // the freq is less than 1Hz), just interpolate it in because it probably does not matter
+
         frequency_hz = 1000 / (min_time_delta);
         frequency_hz = MIN(frequency_hz, 1000);
         frequency_hz = MAX(frequency_hz, 1);
+        min_time_delta = MIN(min_time_delta, 1000);
+
+        // DEBUG always use 1000 and 1 for testing
+        frequency_hz = 250;
+        min_time_delta = 4;
 
         // get good scalers for this data. This is acomplished by first scaling the data to 8*10^x
         // (0.008, 0.8, 80, 8000, ect) base on what is closest, then get a good *10^x exponent to
@@ -577,9 +583,9 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         divisor_s16 >>= 4;
         scaler_s16 >>= 4;
 
-        // fill each of the points of the new data buffer, using linear interpolation
-        // when the time point does not exacly exist. Also use the offset and scaler
-        // to convert the floating point data to an int32
+        // fill each of the points of the new data buffer, using the last recieved
+        // datapoint. Also use the offset and scaler to convert the floating point
+        // data to an int32
         U32 rolling_ts = 0;
         U32* curr_ld_buf = ld_buf;
         curr_ts = curr_gdat->channel.timestamps;
@@ -617,10 +623,8 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
                 }
 
                 // interpolate the data between the point before and point after
-                U32 time_dist_tot = *(curr_ts + 1) - *curr_ts;
-                float interp_data = (*(curr_data + 1) * (rolling_ts - *curr_ts)) +
-                                     (*curr_data * (*(curr_ts + 1) - rolling_ts));
-                interp_data /= time_dist_tot;
+                U32 time_dist_tot = *curr_ts;
+                float interp_data = *curr_data;
 
                 *curr_ld_buf = (U32)(((float)divisor_s16 / scaler_s16) * interp_data * pow(10, base10_shift_s16));
 
@@ -646,7 +650,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             printf("\tdata min: %f\n", data_min);
             printf("\tmax time: %u\n", max_time);
             printf("\tdelta_t max (ms): %u\n", max_time_delta);
-            printf("\tdelta_t mix (ms): %u\n", min_time_delta);
+            printf("\tdelta_t min (ms): %u\n", min_time_delta);
             printf("\toffset: %d\n", offset_s16);
             printf("\tscaler: %d\n", scaler_s16);
             printf("\tdivisor: %d\n", divisor_s16);
