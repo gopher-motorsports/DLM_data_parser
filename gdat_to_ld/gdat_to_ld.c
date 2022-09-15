@@ -19,11 +19,11 @@
 START_OF_FILE_t sof_data = {0};
 FILE_METADATA_t file_data = {0};
 
-const char session_def[] = "F1 Summer Testing";
-const char short_comment_def[] = "Tyler breaking something again";
-const char event_name_def[] = "Monaco Grand Prix";
-const char long_comment_def[] = "What the fuck did you just fucking say about me, you little bitch? I'll have you know I graduated top of my class in the Navy Seals, and I've been involved in numerous secret raids on Al-Quaeda, and I have over 300 confirmed kills. I am trained in gorilla warfare and I'm the top sniper in the entire US armed forces. You are nothing to me but just another target. I will wipe you the fuck out with precision the likes of which has never been seen before on this Earth, mark my fucking words.";
-const char location_def[] = "Spa";
+const char session_def[] = "Session Blank";
+const char short_comment_def[] = "Short Comment Blank";
+const char event_name_def[] = "Event Name Blank";
+const char long_comment_def[] = "Long Comment Blank";
+const char location_def[] = "Location Blank";
 
 // the head node WILL NOT be written in memory so it do not count it
 CHANNEL_DESC_LL_NODE_t channel_head = 
@@ -160,26 +160,26 @@ S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* met
     fgets(location, sizeof(location), stdin);
     printf("Event: ");
     fgets(event_name, sizeof(event_name), stdin);
+    printf("Session: ");
+    fgets(session, sizeof(session), stdin);
     printf("Short Comment: ");
     fgets(short_comment, sizeof(short_comment), stdin);
     printf("Long Comment: ");
     fgets(long_comment, sizeof(long_comment), stdin);
-    printf("Session: ");
-    fgets(session, sizeof(session), stdin);
 
     // remove the extra shit at the end
     cutoff_string(location, MAX_STR_SIZE);
     cutoff_string(event_name, MAX_STR_SIZE);
+    cutoff_string(session, MAX_STR_SIZE);
     cutoff_string(short_comment, MAX_STR_SIZE);
     cutoff_string(long_comment, STR_LEN_LONG);
-    cutoff_string(session, MAX_STR_SIZE);
 
     // check to make sure none of the strings are empty
     if (strlen(location) == 0) strncpy(location, location_def, MAX_STR_SIZE);
     if (strlen(event_name) == 0) strncpy(event_name, event_name_def, MAX_STR_SIZE);
+    if (strlen(session) == 0) strncpy(session, session_def, MAX_STR_SIZE);
     if (strlen(short_comment) == 0) strncpy(short_comment, short_comment_def, MAX_STR_SIZE);
     if (strlen(long_comment) == 0) strncpy(long_comment, long_comment_def, STR_LEN_LONG);
-    if (strlen(session) == 0) strncpy(session, session_def, MAX_STR_SIZE);
 
     if (init_sof_block(sof, year, month, day, hour, min, sec, session, short_comment, team_name) ||
         init_metadata_block(metadat, event_name, session, long_comment, location))
