@@ -38,8 +38,6 @@ int main(int argc, char* argv[])
     //append .csv extention to the txt file name
     strcat(csv_file_name,".csv");
 
-    
-
     // open the input and ouput files
     gdat_file = fopen(input_file, "r");
     //using the new appended file name to open csv file
