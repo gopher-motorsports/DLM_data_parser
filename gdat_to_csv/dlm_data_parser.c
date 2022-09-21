@@ -17,6 +17,9 @@ int main(int argc, char* argv[])
 {
     char gdat_file_name[100];
     char csv_file_name[100];
+    char input_file[100];
+    char csvAppend[4] = ".csv";
+    char gdatAppend[5] = ".gdat";
     FILE* gdat_file;
     FILE* csv_file;
 
@@ -27,8 +30,22 @@ int main(int argc, char* argv[])
         return INCORRECT_ARG_INPUTTED;
     }
 
-    // set the two file names
-    strcpy(input_file_name, argv[1]);
+    //coppy the input from command line into the string named 
+    // input_file_name
+    strcpy(input_file, argv[1]);
+
+    // coppy the file_name into string that is specific to gdat file
+    strcpy(gdat_file_name,input_file);
+    
+    // coppy the file_name into string that is specific to txt file
+    strcpy(csv_file_name,input_file);
+
+    //append .gdat extention to the gdat file name
+    strncat(gdat_file_name,gdatAppend,5);
+
+    //append .txt extention to the txt file name
+    strncat(csv_file,csvAppend,4);
+
     
 
     // open the input and ouput files
