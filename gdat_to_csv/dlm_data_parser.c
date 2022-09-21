@@ -21,19 +21,19 @@ int main(int argc, char* argv[])
     FILE* csv_file;
 
     // check to make sure an argument was actually inputted
-    if (argc <= 2)
+    if (argc <= 1)
     {
         printf("Incorrect arguments inputted\n");
         return INCORRECT_ARG_INPUTTED;
     }
 
     // set the two file names
-    strcpy(gdat_file_name, argv[1]);
-    strcpy(csv_file_name, argv[2]);
+    strcpy(input_file_name, argv[1]);
+    
 
     // open the input and ouput files
-    gdat_file = fopen(input_file.gdat.csv, "r");
-    csv_file = fopen("input_file.gdat.csv", "w");
+    gdat_file = fopen(input_file.gdat, "r");
+    csv_file = fopen(input_file.csv, "w");
 
     if (gdat_file == NULL)
     {
