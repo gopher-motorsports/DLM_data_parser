@@ -32,8 +32,8 @@ int main(int argc, char* argv[])
     strcpy(csv_file_name, argv[2]);
 
     // open the input and ouput files
-    gdat_file = fopen(gdat_file_name, "r");
-    csv_file = fopen(csv_file_name, "w");
+    gdat_file = fopen(input_file.gdat.csv, "r");
+    csv_file = fopen("input_file.gdat.csv", "w");
 
     if (gdat_file == NULL)
     {
