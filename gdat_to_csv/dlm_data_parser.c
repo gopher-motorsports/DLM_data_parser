@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
 
     if (gdat_file == NULL)
     {
-        printf("Failed to open file: %s\n", gdat_file_name);
+        printf("Failed to open file: %s\n", input_file);
         return FAILED_TO_OPEN;
     }
 
