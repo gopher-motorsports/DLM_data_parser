@@ -25,6 +25,7 @@ typedef union
 
 
 // general defines
+#define MAX_FILENAME_SIZE 255
 #define FILE_NAME_MAX_LEN 100
 #define PARAM_ID_SIZE 2
 #define TIMESTAMP_SIZE 4

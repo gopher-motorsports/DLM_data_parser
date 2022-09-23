@@ -15,29 +15,37 @@
 //  open the file, then begin the parsing routine
 int main(int argc, char* argv[])
 {
-    char gdat_file_name[100];
+
     char csv_file_name[100];
+    char input_file[100];
     FILE* gdat_file;
     FILE* csv_file;
 
     // check to make sure an argument was actually inputted
-    if (argc <= 2)
+    if (argc <= 1)
     {
         printf("Incorrect arguments inputted\n");
         return INCORRECT_ARG_INPUTTED;
     }
 
-    // set the two file names
-    strcpy(gdat_file_name, argv[1]);
-    strcpy(csv_file_name, argv[2]);
+    //coppy the input from command line into the string named 
+    // input_file_name
+    strcpy(input_file, argv[1]);
+
+    // coppy the file_name into string that is specific to txt file
+    strcpy(csv_file_name,input_file);
+
+    //append .csv extention to the txt file name
+    strcat(csv_file_name,".csv");
 
     // open the input and ouput files
-    gdat_file = fopen(gdat_file_name, "r");
+    gdat_file = fopen(input_file, "r");
+    //using the new appended file name to open csv file
     csv_file = fopen(csv_file_name, "w");
 
     if (gdat_file == NULL)
     {
-        printf("Failed to open file: %s\n", gdat_file_name);
+        printf("Failed to open file: %s\n", input_file);
         return FAILED_TO_OPEN;
     }
 
