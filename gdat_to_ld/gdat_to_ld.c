@@ -99,6 +99,12 @@ int main(int argc, char** argv)
     }
     */
 
+   // filter outliers from channel data
+   // this will iterate through every channel's data and remove datapoints
+   // with extreme relative changes
+   printf("Filtering outliers...\n");
+   filter_outliers(&gdat_data_head);
+
     // take the data from gdat and use it to fill in all of the ld data headers
     // and data buffers. This will not fill in the file pointers yet. Do some
     // fancy math to figure out what the offset, scaler, divisor, and base10_shift
@@ -447,6 +453,40 @@ int32_t read_data_point(char* str, uint32_t size,
     }
 
     return 0;
+}
+
+void filter_outliers(GDAT_CHANNEL_LL_NODE_t* head)
+{
+    GDAT_CHANNEL_LL_NODE_t* curr_node = head->next;
+    while (curr_node != NULL)
+    {
+        // printf("Channel: %u\n", curr_node->channel.gcan_id);
+        float* data = curr_node->channel.data_points;
+
+        // first datapoint seems to be inaccurate in several channels
+        // e.g. engine rpm and brake light duty cycle
+        // replace with second datapoint
+        *data = *(data + 1);
+
+        // compare remaining datapoints
+        data += 2;
+        while(data - curr_node->channel.data_points < curr_node->channel.num_data_points - 1)
+        {
+            // looking for an extreme change from nonzero to >100
+            float pct_change = (*data - *(data - 1)) / *(data - 1) * 100;
+            if (abs(pct_change) > 100 && *(data - 1) > 0 && *(data + 1) > 100)
+            {
+                // replace outlier with the previous datapoint
+                // printf("prev: %f, curr: %f, pct: %f, next: %f\n", *(data - 1), *data, pct_change, *(data + 1));
+                *data = *(data - 1);
+                data += 2;
+            } else {
+                data += 1;
+            }
+        }
+
+        curr_node = curr_node->next;
+    }
 }
 
 
