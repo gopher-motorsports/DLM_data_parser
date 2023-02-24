@@ -147,6 +147,7 @@ S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* met
 
     // get the time things from the file. Get the integer number and parse
     // from there
+    // TODO replace this
     if (fscanf(file, "/dlm_data_%u_%u", &date_int, &time_int) == 0)
     {
         printf("Failed to get the metadata\n");
@@ -233,6 +234,8 @@ S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head)
 
         if (temp_char == PACK_START) break;
     }
+
+    // TODO checksum decoding needed
 
     // take in the data point by point
     while (fread(&temp_char, 1, sizeof(char), file))
@@ -455,6 +458,7 @@ int32_t read_data_point(char* str, uint32_t size,
     return 0;
 }
 
+// TODO look into this function
 void filter_outliers(GDAT_CHANNEL_LL_NODE_t* head)
 {
     GDAT_CHANNEL_LL_NODE_t* curr_node = head->next;
@@ -561,6 +565,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         min_time_delta = MIN(min_time_delta, 1000);
 
         // DEBUG always use 1000 and 1 for testing
+        // TODO fix the logic above so i2 file sizes are not giant
         frequency_hz = 250;
         min_time_delta = 4;
 
