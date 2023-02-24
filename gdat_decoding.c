@@ -166,10 +166,11 @@ DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat)
     {
         // print out the details of the bad packet
         printf("FAILED CHECKSUM\n");
-        printf("Raw Bytes:");
+        printf("  Raw Bytes:");
         for (uint8_t c = 0; c < raw_size; c++) printf(" %x", raw_bytes[c]);
-        printf("Processed Bytes: ");
+        printf("\n  Processed Bytes: ");
         for (uint8_t c = 0; c < processed_size; c++) printf(" %x", processed_bytes[c]);
+        printf("\n");
         return BAD_PACKET_CHECKSUM;
     }
 
