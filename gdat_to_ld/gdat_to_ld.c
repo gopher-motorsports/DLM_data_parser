@@ -8,6 +8,7 @@
 #include "gdat_to_ld.h"
 #include "ld_writing.h"
 #include "../../gophercan-lib/GopherCAN_names.h"
+#include "../gdat_decoding.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -99,12 +100,6 @@ int main(int argc, char** argv)
     }
     */
 
-   // filter outliers from channel data
-   // this will iterate through every channel's data and remove datapoints
-   // with extreme relative changes
-   printf("Filtering outliers...\n");
-   filter_outliers(&gdat_data_head);
-
     // take the data from gdat and use it to fill in all of the ld data headers
     // and data buffers. This will not fill in the file pointers yet. Do some
     // fancy math to figure out what the offset, scaler, divisor, and base10_shift
@@ -130,12 +125,8 @@ int main(int argc, char** argv)
 //  Function to open the input file, read the date and time, and ask the 
 //  user for some metadata. Store all of this and add it the the ld file
 //  we are working with
-S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* metadat)
+S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* ld_metadata)
 {
-    U16 year;
-    U8 month, day, hour, min, sec;
-    U32 date_int = 0;
-    U32 time_int = 0;
     char* char_ptr;
     char temp_char[MAX_STR_SIZE];
     char session[MAX_STR_SIZE];
@@ -144,22 +135,14 @@ S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* met
     char event_name[MAX_STR_SIZE];
     char long_comment[STR_LEN_LONG];
     char location[MAX_STR_SIZE];
+    METADATA_t gdat_metadata;
 
-    // get the time things from the file. Get the integer number and parse
-    // from there
-    // TODO replace this
-    if (fscanf(file, "/dlm_data_%u_%u", &date_int, &time_int) == 0)
+    // get the metadata info from the file
+    if (get_file_metadata(&gdat_metadata, file) != DECODE_SUCCESS)
     {
         printf("Failed to get the metadata\n");
         return -1;
     }
-    // ints are in base10 format YYYYMMDD and HHMMSS
-    year = date_int / 10000;
-    month = (date_int / 100) % 100;
-    day = date_int % 100;
-    hour = time_int / 10000;
-    min = (time_int / 100) % 100;
-    sec = time_int % 100;
 
     // ask for the other metadata things, most improtant first
     printf("Fill int the following fields:\n");
@@ -188,8 +171,10 @@ S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* met
     if (strlen(short_comment) == 0) strncpy(short_comment, short_comment_def, MAX_STR_SIZE);
     if (strlen(long_comment) == 0) strncpy(long_comment, long_comment_def, STR_LEN_LONG);
 
-    if (init_sof_block(sof, year, month, day, hour, min, sec, session, short_comment, team_name) ||
-        init_metadata_block(metadat, event_name, session, long_comment, location))
+    if (init_sof_block(sof, gdat_metadata.year, gdat_metadata.month, gdat_metadata.day,
+                       gdat_metadata.hour, gdat_metadata.min, gdat_metadata.sec, session,
+                       short_comment, team_name) ||
+        init_metadata_block(ld_metadata, event_name, session, long_comment, location))
     {
         printf("Failed to init metadata\n");
         return -1;
@@ -205,84 +190,37 @@ S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* met
 //  will ensure the data is in order when it is done
 S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head)
 {
-    unsigned char temp_char;
-    bool esc_next = false;
-    unsigned char byte_seq[(TOTAL_SIZE+1)*2] = {0};
-    uint32_t pack_size = 0;
     U32 bad_packets = 0;
     U32 total_packets = 0;
-    U16 param = 0;
-    U32 timestamp = 0;
-    double data;
-    char temp_str[MAX_STR_SIZE] = "";
+    DATAPOINT_t datapoint = {0};
 
-    // place the file pointer in the correct spot (second line)
-    fseek(file, 0, SEEK_SET);
-    if (fgets(temp_str, MAX_STR_SIZE, file) == 0)
-    {
-        printf("Failed a read\n");
-        return -1;
-    }
-
-    // find the first start byte
+    // reading file loop
     while (1)
     {
-        if (fread(&temp_char, 1, sizeof(char), file) == 0)
+        switch (convert_data_point(&datapoint, file))
         {
-            return -1;
-        }
-
-        if (temp_char == PACK_START) break;
-    }
-
-    // TODO checksum decoding needed
-
-    // take in the data point by point
-    while (fread(&temp_char, 1, sizeof(char), file))
-    {
-        // reset the integers
-        param = 0;
-        timestamp = 0;
-        data = 0;
-
-        switch (temp_char)
-        {
-        case PACK_START:
+        case DECODE_SUCCESS:
+            // new packet read
+            if (add_datapoint(datapoint.timestamp, datapoint.gcan_id,
+                              datapoint.data, head)) return -1;
             total_packets++;
-            // convert this string into variables and add to the CSV
-            if (read_data_point(byte_seq, pack_size, &timestamp, &param, &data)) 
-            {
-                // failed to read the last packet
-                bad_packets++;
-                pack_size = 0;
-                break;
-            }
-            if (add_datapoint(timestamp, param, data, head)) return -1;
-            pack_size = 0;
-            break;
-
-        case ESCAPE_CHAR:
-            // make sure to escape the next byte. Dont increase the size
-            esc_next = true;
             break;
         
+        case END_OF_FILE:
+            // we are done. Give out the info and return
+            printf("Conversion complete\n");
+            printf("Total packets: %u\n", total_packets);
+            printf("Bad packets:   %u\n", bad_packets);
+            return PARSER_SUCCESS;
+
         default:
-            // append this byte to the current string
-            if (esc_next)
-            {
-                temp_char ^= ESCAPE_XOR;
-                esc_next = false;
-            }
-            byte_seq[pack_size] = temp_char;
-            pack_size++;
+            // there was some issue with the packet. Note it
+            // and move on
+            total_packets++;
+            bad_packets++;
             break;
         }
     }
-
-    // print some data about the file
-    printf("Conversion complete\n");
-    printf("Total packets: %u\n", total_packets);
-    printf("Bad packets:   %u\n", bad_packets);
 
     return 0;
 }
@@ -325,7 +263,7 @@ S8 add_datapoint(U32 timestamp, U16 param, double data, GDAT_CHANNEL_LL_NODE_t* 
 
         // give the starting amount of memory for the data arrays
         curr_node->channel.timestamps = (U32*)malloc(STARTING_NUM_POINTS*sizeof(U32));
-        curr_node->channel.data_points = (float*)malloc(STARTING_NUM_POINTS*sizeof(float));
+        curr_node->channel.data_points = (double*)malloc(STARTING_NUM_POINTS*sizeof(double));
         if (!curr_node->channel.timestamps || !curr_node->channel.data_points)
         {
             printf("Failed a malloc\n");
@@ -333,14 +271,15 @@ S8 add_datapoint(U32 timestamp, U16 param, double data, GDAT_CHANNEL_LL_NODE_t* 
         }
     }
 
-    // if the array is not big enough to handle this
+    // if the array is not big enough to handle this new point, double the amount
+    // of memory allocated to it
     if (curr_node->channel.num_data_points == curr_node->channel.array_size)
     {
         curr_node->channel.array_size = curr_node->channel.array_size * 2;
         curr_node->channel.timestamps = (U32*)realloc(curr_node->channel.timestamps,
                                                         curr_node->channel.array_size * sizeof(U32));
-        curr_node->channel.data_points = (float*)realloc(curr_node->channel.data_points,
-                                                            curr_node->channel.array_size * sizeof(float));
+        curr_node->channel.data_points = (double*)realloc(curr_node->channel.data_points,
+                                                            curr_node->channel.array_size * sizeof(double));
 
         if (!curr_node->channel.timestamps || !curr_node->channel.data_points)
         {
@@ -351,7 +290,7 @@ S8 add_datapoint(U32 timestamp, U16 param, double data, GDAT_CHANNEL_LL_NODE_t* 
 
     // inset the node into the correct spot into the array based on the timestamp
     U32* curr_ts = curr_node->channel.timestamps + curr_node->channel.num_data_points; // start at the end + 1
-    float* curr_dat = curr_node->channel.data_points + curr_node->channel.num_data_points;
+    double* curr_dat = curr_node->channel.data_points + curr_node->channel.num_data_points;
     while (curr_ts > curr_node->channel.timestamps && timestamp <= *(curr_ts - 1))
     {
         // the timestamp arrays must move down
@@ -363,134 +302,11 @@ S8 add_datapoint(U32 timestamp, U16 param, double data, GDAT_CHANNEL_LL_NODE_t* 
     }
 
     *curr_ts = timestamp;
-    *curr_dat = (float)data;
+    *curr_dat = (double)data;
 
     curr_node->channel.num_data_points++;
 
     return 0;
-}
-
-
-// read_data_point
-//  takes a string and size, fills in the pointers passed in
-int32_t read_data_point(char* str, uint32_t size,
-                        uint32_t* timestamp, uint16_t* param, double* data)
-{
-    DPF_CONVERTER read_data;
-    uint32_t target_size;
-    // reset the integers
-    *param = 0;
-    *timestamp = 0;
-    *data = 0;
-    read_data.u64 = 0;
-
-    // make sure the size is reasonable
-    if (size <= PARAM_ID_SIZE + TIMESTAMP_SIZE) return -1;
-
-    // read the param and timestamp as normal
-    *timestamp |= ((uint32_t)(str[3])) & 0xff;
-    *timestamp |= ((uint32_t)(str[2]) << (8*1)) & 0xff00;
-    *timestamp |= ((uint32_t)(str[1]) << (8*2)) & 0xff0000;
-    *timestamp |= ((uint32_t)(str[0]) << (8*3)) & 0xff000000;
-    *param |= ((uint16_t)(str[5])) & 0xff;
-    *param |= ((uint16_t)(str[4]) << 8) & 0xff00;
-
-    // read the data into the uint64_t based on the size
-    uint32_t byte_pos = size - 1;
-    for (uint32_t c = 0; c < size - (PARAM_ID_SIZE + TIMESTAMP_SIZE); c++)
-    {
-        read_data.u64 |= (((uint64_t)(str[byte_pos]) & 0xff) << (8*c));
-        byte_pos--;
-    }
-
-    // convert from the correct data type to a double
-    if (*param >= NUM_OF_PARAMETERS) return -1;
-    switch (param_types[*param])
-    {
-    case UINT_8:
-        target_size = sizeof(uint8_t);
-        *data = (uint8_t)read_data.u64;
-        break;
-    case UINT_16:
-        target_size = sizeof(uint16_t);
-        *data = (uint16_t)read_data.u64;
-        break;
-    case UINT_32:
-        target_size = sizeof(uint32_t);
-        *data = (uint32_t)read_data.u64;
-        break;
-    case UINT_64:
-        target_size = sizeof(uint64_t);
-        *data = (uint64_t)read_data.u64;
-        break;
-    case SINT_8:
-        target_size = sizeof(int8_t);
-        *data = (int8_t)read_data.u64;
-        break;
-    case SINT_16:
-        target_size = sizeof(int16_t);
-        *data = (int16_t)read_data.u64;
-        break;
-    case SINT_32:
-        target_size = sizeof(int32_t);
-        *data = (int32_t)read_data.u64;
-        break;
-    case SINT_64:
-        target_size = sizeof(int64_t);
-        *data = (int64_t)read_data.u64;
-        break;
-    case FLOAT:
-        target_size = sizeof(float);
-        FLT_CONVERTER flt_con;
-        flt_con.u32 = read_data.u64;
-        *data = flt_con.f;
-        break;
-    default:
-        return -1;
-        break;
-    }
-
-    if (size - (PARAM_ID_SIZE + TIMESTAMP_SIZE) != target_size)
-    {
-        return -1;
-    }
-
-    return 0;
-}
-
-// TODO look into this function
-void filter_outliers(GDAT_CHANNEL_LL_NODE_t* head)
-{
-    GDAT_CHANNEL_LL_NODE_t* curr_node = head->next;
-    while (curr_node != NULL)
-    {
-        // printf("Channel: %u\n", curr_node->channel.gcan_id);
-        float* data = curr_node->channel.data_points;
-
-        // first datapoint seems to be inaccurate in several channels
-        // e.g. engine rpm and brake light duty cycle
-        // replace with second datapoint
-        *data = *(data + 1);
-
-        // compare remaining datapoints
-        data += 2;
-        while(data - curr_node->channel.data_points < curr_node->channel.num_data_points - 1)
-        {
-            // looking for an extreme change from nonzero to >100
-            float pct_change = (*data - *(data - 1)) / *(data - 1) * 100;
-            if (abs(pct_change) > 100 && *(data - 1) > 0 && *(data + 1) > 100)
-            {
-                // replace outlier with the previous datapoint
-                // printf("prev: %f, curr: %f, pct: %f, next: %f\n", *(data - 1), *data, pct_change, *(data + 1));
-                *data = *(data - 1);
-                data += 2;
-            } else {
-                data += 1;
-            }
-        }
-
-        curr_node = curr_node->next;
-    }
 }
 
 
@@ -501,15 +317,18 @@ void filter_outliers(GDAT_CHANNEL_LL_NODE_t* head)
 S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NODE_t* ld_head,
                           bool print_chan_stats)
 {
+    // TODO this function needs to be re-written slightly to account for DPF so
+    // U32s can be correctly and completely logged
+
     GDAT_CHANNEL_LL_NODE_t* curr_gdat = gdat_head->next;
     U32 min_time_delta = UINT32_MAX;
     U32 max_time_delta = 0;
     U32 max_time = 0;
     U32 frequency_hz = 0;
-    float data_min = FLT_MAX;
-    float data_max = FLT_MIN;
+    double data_min = FLT_MAX;
+    double data_max = FLT_MIN;
 
-    float scaler_float;
+    double scaler_float;
     S16 offset_s16;
     S16 scaler_s16;
     S16 divisor_s16;
@@ -523,10 +342,11 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
     char name_shrt[MAX_STR_SIZE];
     char chan_unit[MAX_STR_SIZE];
 
+    // iterate through all of the channels
     while (curr_gdat != NULL)
     {
         U32* curr_ts = curr_gdat->channel.timestamps;
-        float* curr_data = curr_gdat->channel.data_points;
+        double* curr_data = curr_gdat->channel.data_points;
         max_time = 0;
         min_time_delta = UINT32_MAX;
         max_time_delta = 0;
@@ -558,22 +378,25 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
 
         // limit the freq to 1 - 1000. If the data is less complete than this (in reality logging
         // the freq is less than 1Hz), just interpolate it in because it probably does not matter
-
         frequency_hz = 1000 / (min_time_delta);
         frequency_hz = MIN(frequency_hz, 1000);
         frequency_hz = MAX(frequency_hz, 1);
         min_time_delta = MIN(min_time_delta, 1000);
 
-        // DEBUG always use 1000 and 1 for testing
-        // TODO fix the logic above so i2 file sizes are not giant
-        frequency_hz = 250;
-        min_time_delta = 4;
+        // TODO there is a bug where if the minimum timestamp is not a frequency that
+        // can be represented as an integer, the files will not render correctly as
+        // there are math errors
 
         // get good scalers for this data. This is acomplished by first scaling the data to 8*10^x
         // (0.008, 0.8, 80, 8000, ect) base on what is closest, then get a good *10^x exponent to
-        // scale the data to 8000000 (approx 2^23, the size of float mantissa). This should garuntee
-        // precision is kept as long as the numbers are not too large
-        float scaling_value = MAX(fabs(data_max), fabs(data_min)); // scale using the largest ABS
+        // scale the data to 0xFFFFFFFF, the size of a U32. This should garuntee precision is
+        // kept as long as the numbers are not too large
+
+        // TODO fix this scaling math to be less janky. Currently there are issues when
+        // small numbers (ex: states) are scaled up to really big numbers and precision
+        // is often put in the wrong place because of base10 in floating point
+
+        double scaling_value = MAX(abs(data_max), abs(data_min)); // scale using the largest ABS
 
         S16 exp;
         bool done = false;
