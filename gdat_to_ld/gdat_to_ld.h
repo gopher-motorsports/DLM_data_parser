@@ -37,7 +37,8 @@ struct GDAT_CHANNEL_LL_NODE_t
 
 S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* metadat);
 void cutoff_string(char* str, U32 length);
-S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head);
+S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head, bool debug_prints);
+void print_channels(GDAT_CHANNEL_LL_NODE_t* head);
 S8 add_datapoint(U32 timestamp, U16 param, double data, GDAT_CHANNEL_LL_NODE_t* head);
 S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NODE_t* ld_head,
                           bool print_chan_stats);

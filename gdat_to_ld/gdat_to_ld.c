@@ -77,47 +77,29 @@ int main(int argc, char** argv)
 
     // read in the gdat file and store all the data in ram with some linked
     // lists for all of the data nodes
-    printf("Importing data from the file...\n");
-    if (import_gdat(in_file, &gdat_data_head));
+    printf("\nImporting data from the file...\n");
+    if (import_gdat(in_file, &gdat_data_head, false));
 
     fclose(in_file);
-
-    /*
-    // DEBUG print all of the channels
-    GDAT_CHANNEL_LL_NODE_t* curr_node = gdat_data_head.next;
-    while (curr_node != NULL)
-    {
-        printf("Channel: %u\n", curr_node->channel.gcan_id);
-        U32* ts = curr_node->channel.timestamps;
-        float* data = curr_node->channel.data_points;
-        while(ts - curr_node->channel.timestamps < curr_node->channel.num_data_points)
-        {
-            printf("\t%u\t%f\n", *ts, *data);
-            ts++;
-            data++;
-        }
-        curr_node = curr_node->next;
-    }
-    */
 
     // take the data from gdat and use it to fill in all of the ld data headers
     // and data buffers. This will not fill in the file pointers yet. Do some
     // fancy math to figure out what the offset, scaler, divisor, and base10_shift
     // should be. Also find the logging frequency and give stats about the channel
-    printf("Converting data to ld file format...\n");
-    if (build_ld_data_channels(&gdat_data_head, &channel_head, true));
+    printf("\nConverting data to ld file format...\n");
+    if (build_ld_data_channels(&gdat_data_head, &channel_head, false));
 
     // Run the "linker". This will fill out correct file space for all of the different
     // blocks of data and makes sure they will be correctly pointed to in the file
-    printf("Linking file pointers...\n");
+    printf("\nLinking file pointers...\n");
     if (link_id_file(&sof_data, &file_data, &channel_head)) return -1;
 
     // Open a new file with the correct name and begin writing all of the data to it.
     // Layout the file as planned after the linker was run
-    printf("Writing ld data...\n");
+    printf("\nWriting ld data...\n");
     if (write_id_file(&sof_data, &file_data, &channel_head, out_filename)) return -1;
 
-    printf("Conversion sucessful\n");
+    printf("\nConversion sucessful\n");
 }
 
 
@@ -188,7 +170,7 @@ S8 build_ld_file_metadata(FILE* file, START_OF_FILE_t* sof, FILE_METADATA_t* ld_
 //  import the data in the gdat file. This will be stored as timestamped
 //  data nodes for now, and will be converted to evenly spaced samples later. This
 //  will ensure the data is in order when it is done
-S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head)
+S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head, bool debug_prints)
 {
     U32 bad_packets = 0;
     U32 total_packets = 0;
@@ -211,6 +193,9 @@ S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head)
             printf("Conversion complete\n");
             printf("Total packets: %u\n", total_packets);
             printf("Bad packets:   %u\n", bad_packets);
+
+            if (debug_prints) print_channels(head);
+
             return PARSER_SUCCESS;
 
         default:
@@ -223,6 +208,27 @@ S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head)
     }
 
     return 0;
+}
+
+// print_channels
+//  pass in the head node, this function will print out all of the datapoints
+//  in each channel
+void print_channels(GDAT_CHANNEL_LL_NODE_t* head)
+{
+    GDAT_CHANNEL_LL_NODE_t* curr_node = head->next;
+    while (curr_node != NULL)
+    {
+        printf("Channel: %u\n", curr_node->channel.gcan_id);
+        U32* ts = curr_node->channel.timestamps;
+        double* data = curr_node->channel.data_points;
+        while(ts - curr_node->channel.timestamps < curr_node->channel.num_data_points)
+        {
+            printf("\t%u\t%f\n", *ts, *data);
+            ts++;
+            data++;
+        }
+        curr_node = curr_node->next;
+    }
 }
 
 
@@ -317,9 +323,6 @@ S8 add_datapoint(U32 timestamp, U16 param, double data, GDAT_CHANNEL_LL_NODE_t* 
 S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NODE_t* ld_head,
                           bool print_chan_stats)
 {
-    // TODO this function needs to be re-written slightly to account for DPF so
-    // U32s can be correctly and completely logged
-
     GDAT_CHANNEL_LL_NODE_t* curr_gdat = gdat_head->next;
     U32 min_time_delta = UINT32_MAX;
     U32 max_time_delta = 0;
@@ -389,7 +392,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
 
         // get good scalers for this data. This is acomplished by first scaling the data to 8*10^x
         // (0.008, 0.8, 80, 8000, ect) base on what is closest, then get a good *10^x exponent to
-        // scale the data to 0xFFFFFFFF, the size of a U32. This should garuntee precision is
+        // scale the data to 2^23, the size of a float mantissa. This should garuntee precision is
         // kept as long as the numbers are not too large
 
         // TODO fix this scaling math to be less janky. Currently there are issues when
