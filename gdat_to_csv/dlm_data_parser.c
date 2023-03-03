@@ -39,9 +39,9 @@ int main(int argc, char* argv[])
     strcat(csv_file_name,".csv");
 
     // open the input and ouput files
-    gdat_file = fopen(input_file, "r");
+    gdat_file = fopen(input_file, "rb");
     //using the new appended file name to open csv file
-    csv_file = fopen(csv_file_name, "w");
+    csv_file = fopen(csv_file_name, "wb");
 
     if (gdat_file == NULL)
     {
@@ -90,7 +90,7 @@ int convert_gdat_to_csv(FILE* gdat, FILE* csv)
     // reading file loop
     while (1)
     {
-        switch (convert_data_point(&datapoint, gdat))
+        switch (convert_data_point(&datapoint, gdat, true))
         {
         case DECODE_SUCCESS:
             // print out the info from the packet

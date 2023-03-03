@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 // gdat specific defines
 #define PARAM_ID_SIZE 2
@@ -69,7 +70,7 @@ typedef struct
 } METADATA_t;
 
 DECODER_ERRORS_t get_file_metadata(METADATA_t* metadata, FILE* gdat);
-DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat);
+DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat, bool print_errors);
 
 #endif // GDAT_DECODING_H
 

@@ -59,10 +59,11 @@ DECODER_ERRORS_t get_file_metadata(METADATA_t* metadata, FILE* gdat)
 // params:
 //  datapoint: The timestamp, id, and data(double) of the packet
 //  gdat: .gdat file being read from
+//  print_errors: whether to print errors or not
 // returns:
 //  result of the operation. Different macros for success, end of file,
 //  and bad packets
-DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat)
+DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat, bool print_errors)
 {
     uint8_t checksum = 0;
     uint8_t raw_size = 0;
@@ -70,6 +71,7 @@ DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat)
     uint8_t raw_bytes[MAX_RAW_SIZE] = {0};
     uint8_t processed_bytes[TOTAL_SIZE-CHECKSUM_SIZE] = {0};
     uint8_t temp_byte = '\0';
+    DECODER_ERRORS_t result;
 
     // find the next available start byte. Print out if any bytes are being
     // skipped as there may be lost data
@@ -122,6 +124,13 @@ DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat)
         }
     }
 
+    // there is a bug where two PACK_STARTs in a row really fucks shit up. Make sure
+    // the size is big enough to be somewhat reasonable
+    if (raw_size < (PARAM_ID_SIZE+TIMESTAMP_SIZE))
+    {
+        return INVALID_PACKET_SIZE;
+    }
+
     // calculate the checksum of this packet. Remember the checksum byte
     // is not included in the checksum, even if it is escaped
     for (uint8_t c = 0; c < (raw_size - 1); c++)
@@ -165,19 +174,37 @@ DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat)
     if (checksum != processed_bytes[processed_size - 1])
     {
         // print out the details of the bad packet
-        printf("FAILED CHECKSUM\n");
-        printf("  Raw Bytes:");
-        for (uint8_t c = 0; c < raw_size; c++) printf(" %x", raw_bytes[c]);
-        printf("\n  Processed Bytes: ");
-        for (uint8_t c = 0; c < processed_size; c++) printf(" %x", processed_bytes[c]);
-        printf("\n");
+        if (print_errors)
+        {
+            printf("FAILED CHECKSUM\n");
+            printf("  Raw Bytes:");
+            for (uint8_t c = 0; c < raw_size; c++) printf(" %x", raw_bytes[c]);
+            printf("\n  Processed Bytes: ");
+            for (uint8_t c = 0; c < processed_size; c++) printf(" %x", processed_bytes[c]);
+            printf("\n");
+        }
         return BAD_PACKET_CHECKSUM;
     }
 
     // read the data from the packet. We can remove the checksum byte
     // at this point
     processed_size--;
-    return read_data_point(datapoint, processed_bytes, processed_size);
+    result = read_data_point(datapoint, processed_bytes, processed_size);
+
+    if (result != DECODE_SUCCESS)
+    {
+        if (print_errors)
+        {
+            printf("BAD PACKET PASSED CHECKSUM\n");
+            printf("  Raw Bytes:");
+            for (uint8_t c = 0; c < raw_size; c++) printf(" %x", raw_bytes[c]);
+            printf("\n  Processed Bytes: ");
+            for (uint8_t c = 0; c < processed_size; c++) printf(" %x", processed_bytes[c]);
+            printf("\n");
+        }
+    }
+
+    return result;
 }
 
 

@@ -193,7 +193,7 @@ S8 write_id_file(START_OF_FILE_t* sof, FILE_METADATA_t* metadat, CHANNEL_DESC_LL
     U8 chan_desc_str[CHANNEL_DESC_SIZE] = {0};
 
     // make the new file
-    file = fopen(filename, "w");
+    file = fopen(filename, "wb");
     if (!file)
     {
         printf("failed to open file\n");

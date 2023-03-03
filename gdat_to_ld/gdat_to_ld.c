@@ -62,7 +62,7 @@ int main(int argc, char** argv)
     strcat(out_filename, ".ld");
 
     // open the input file
-    in_file = fopen(in_filename, "r");
+    in_file = fopen(in_filename, "rb");
     if (!in_file)
     {
         printf("Failed to open file: %s\n", in_filename);
@@ -179,7 +179,7 @@ S8 import_gdat(FILE* file, GDAT_CHANNEL_LL_NODE_t* head, bool debug_prints)
     // reading file loop
     while (1)
     {
-        switch (convert_data_point(&datapoint, file))
+        switch (convert_data_point(&datapoint, file, debug_prints))
         {
         case DECODE_SUCCESS:
             // new packet read
@@ -388,7 +388,9 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
 
         // TODO there is a bug where if the minimum timestamp is not a frequency that
         // can be represented as an integer, the files will not render correctly as
-        // there are math errors
+        // there are timing errors. Just locking to 200Hz on each channel
+        frequency_hz = 200;
+        min_time_delta = 5;
 
         // get good scalers for this data. This is acomplished by first scaling the data to 8*10^x
         // (0.008, 0.8, 80, 8000, ect) base on what is closest, then get a good *10^x exponent to
@@ -451,6 +453,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             return -1;
         }
 
+        // TODO not sure why this is here. Maybe only 12bits are actually used?
         divisor_s16 >>= 4;
         scaler_s16 >>= 4;
 

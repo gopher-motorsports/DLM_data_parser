@@ -2,6 +2,12 @@ CC=gcc
 CFLAGS=-lm
 DBFLAGS=-g
 
+ifeq ($(OS),Windows_NT)
+	RM = del
+else
+	RM = rm
+endif
+
 all: gdat_to_ld.c ld_writing.o GopherCAN_names.o gdat_decoding.o gdat_to_ld.h ld_writing.h types.h ../../gophercan-lib/GopherCAN_names.h ../gdat_decoding.h
 	$(CC) $(DBFLAGS) -o ld_converter ld_writing.o GopherCAN_names.o gdat_decoding.o gdat_to_ld.c $(CFLAGS) 
 
@@ -17,4 +23,4 @@ gdat_decoding.o: ../gdat_decoding.c
 .PHONY: clean
 
 clean:
-	rm *.o ld_converter
+	$(RM) *.o ld_converter
