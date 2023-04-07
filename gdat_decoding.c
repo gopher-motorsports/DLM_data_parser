@@ -131,9 +131,6 @@ DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat, bool pri
         return INVALID_PACKET_SIZE;
     }
 
-    // calculate the checksum of this packet. Remember the checksum byte
-    // is not included in the checksum, even if it is escaped
-    for (uint8_t c = 0; c < (raw_size - 1); c++)
     {
         checksum += raw_bytes[c];
     }
@@ -162,12 +159,13 @@ DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat, bool pri
         }
     }
 
-    // if the checksum byte was escaped, we also need to remove the escape
-    // character from the checksum
-    if (processed_bytes[processed_size - 1] == PACK_START ||
-        processed_bytes[processed_size - 1] == ESCAPE_CHAR)
+    // calculate the checksum of all of the bytes we got. This is done on the
+    // processed bytes, and includes the start byte (which is not in the processed
+    // byte array)
+    checksum = PACK_START;
+    for (uint8_t c = 0; c < (processed_size - 1); c++)
     {
-        checksum -= ESCAPE_CHAR;
+        checksum += processed_bytes[c];
     }
 
     // check if the checksum is good
