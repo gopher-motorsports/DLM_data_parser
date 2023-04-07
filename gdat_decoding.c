@@ -131,10 +131,6 @@ DECODER_ERRORS_t convert_data_point(DATAPOINT_t* datapoint, FILE* gdat, bool pri
         return INVALID_PACKET_SIZE;
     }
 
-    {
-        checksum += raw_bytes[c];
-    }
-
     // remove all of the escape characters from the array, creating a new
     // array that does not have a start byte or any escape characters. Start
     // at 1 to skip the start byte
