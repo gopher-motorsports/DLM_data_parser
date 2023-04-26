@@ -25,31 +25,49 @@ DECODER_ERRORS_t get_file_metadata(METADATA_t* metadata, FILE* gdat)
 {
     uint32_t date_int = 0;
     uint32_t time_int = 0;
+    int32_t ret_val = 0;
 
     // get the info for decoding
     fseek(gdat, 0, SEEK_SET);
-    if (fscanf(gdat, "/dlm_data_%u_%u", &date_int, &time_int) == 0)
+    ret_val = fscanf(gdat, "/dlm_data_%u_%u", &date_int, &time_int);
+    if (ret_val != 0)
     {
-        printf("Failed to get the metadata\n");
-        return END_OF_FILE;
+        // DLM metadata
+        metadata->year = date_int / 10000;
+        metadata->month = (date_int / 100) % 100;
+        metadata->day = date_int % 100;
+        metadata->hour = time_int / 10000;
+        metadata->min = (time_int / 100) % 100;
+        metadata->sec = time_int % 100;
+
+        // get the complete metadata string
+        fseek(gdat, 0, SEEK_SET);
+        if (fgets(metadata->meta_str, MAX_METADATA_SIZE, gdat) == 0)
+        {
+            printf("Failed to get the metadata\n");
+            return END_OF_FILE;
+        }
+        return DECODE_SUCCESS;
     }
-
-    metadata->year = date_int / 10000;
-    metadata->month = (date_int / 100) % 100;
-    metadata->day = date_int % 100;
-    metadata->hour = time_int / 10000;
-    metadata->min = (time_int / 100) % 100;
-    metadata->sec = time_int % 100;
-
-    // get the info for file reading
     fseek(gdat, 0, SEEK_SET);
-    if (fgets(metadata->meta_str, MAX_METADATA_SIZE, gdat) == 0)
+    ret_val = fscanf(gdat, "/PLM_%hu_%hhu_%hhu_%hhu_%hhu_%hhu", &metadata->year, &metadata->month,
+                     &metadata->day, &metadata->hour, &metadata->min, &metadata->sec);
+    if (ret_val != 0)
     {
-        printf("Failed to get the metadata\n");
-        return END_OF_FILE;
+        // PLM metadata
+        // get the complete metadata string
+        fseek(gdat, 0, SEEK_SET);
+        if (fgets(metadata->meta_str, MAX_METADATA_SIZE, gdat) == 0)
+        {
+            printf("Failed to get the metadata\n");
+            return END_OF_FILE;
+        }
+
+        return DECODE_SUCCESS;
     }
 
-    return DECODE_SUCCESS;
+    printf("Failed to get the metadata\n");
+    return END_OF_FILE;
 }
 
 
