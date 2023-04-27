@@ -15,6 +15,7 @@
 #include <float.h>
 #include <math.h>
 
+#define MAX_TIME_STEP 1000
 
 // define everything that is neede in static memory
 START_OF_FILE_t sof_data = {0};
@@ -323,22 +324,17 @@ S8 add_datapoint(U32 timestamp, U16 param, double data, GDAT_CHANNEL_LL_NODE_t* 
 S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NODE_t* ld_head,
                           bool print_chan_stats)
 {
-    GDAT_CHANNEL_LL_NODE_t* curr_gdat = gdat_head->next;
-    U32 min_time_delta = UINT32_MAX;
-    U32 max_time_delta = 0;
+    GDAT_CHANNEL_LL_NODE_t* curr_gdat = gdat_head->next; 
     U32 max_time = 0;
     U32 frequency_hz = 0;
+    U32 time_delta_ms;
+    U32 max_num_of_deltas;
     double data_min = FLT_MAX;
     double data_max = FLT_MIN;
 
-    double scaler_float;
-    S16 offset_s16;
-    S16 scaler_s16;
-    S16 divisor_s16;
-    S16 base10_shift_s16;
-
     U32* ld_buf;
     U32 ld_data_points;
+    U32 delta_list[MAX_TIME_STEP+1] = {0};
 
     // the channel cant hold strings this long, but strncpy will append
     char chan_name[MAX_STR_SIZE];
@@ -351,10 +347,9 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         U32* curr_ts = curr_gdat->channel.timestamps;
         double* curr_data = curr_gdat->channel.data_points;
         max_time = 0;
-        min_time_delta = UINT32_MAX;
-        max_time_delta = 0;
         data_min = FLT_MAX;
         data_max = FLT_MIN;
+        memset(delta_list, 0, sizeof(delta_list));
 
         // calculate the minimum and maximum of the channel and scale it correctly to a U32
         // with scaling to match the ld format. Also calculate the minimum time between points
@@ -370,8 +365,10 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             if (curr_ts != curr_gdat->channel.timestamps)
             {
                 this_delta = *curr_ts - *(curr_ts - 1);
-                if (this_delta > max_time_delta) max_time_delta = this_delta;
-                if (this_delta < min_time_delta && this_delta > 0) min_time_delta = this_delta; // ignore deltas of 0, these shouldnt exist so it could be a bug
+                if (this_delta <= MAX_TIME_STEP)
+                {
+                    delta_list[this_delta]++;
+                }
             }
 
             curr_ts++;
@@ -379,73 +376,85 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         }
         max_time = *(curr_ts - 1);
 
-        // limit the freq to 1 - 1000. If the data is less complete than this (in reality logging
-        // the freq is less than 1Hz), just interpolate it in because it probably does not matter
-        frequency_hz = 1000 / (min_time_delta);
+        // find the most common time delta
+        max_num_of_deltas = 0;
+        time_delta_ms = MAX_TIME_STEP;
+        frequency_hz = 1;
+        for (U32 c = 1; c <= MAX_TIME_STEP; c++) // skip a delta of 0ms
+        {
+            if (delta_list[c] > max_num_of_deltas)
+            {
+                max_num_of_deltas = delta_list[c];
+                time_delta_ms = c;
+            }
+        }
+
+        // round the delta up to the next time delta that can be represented as and integer
+        // for both ms and Hz
+        while (1000 % time_delta_ms != 0) time_delta_ms++;
+        frequency_hz = 1000 / (time_delta_ms);
         frequency_hz = MIN(frequency_hz, 1000);
         frequency_hz = MAX(frequency_hz, 1);
-        min_time_delta = MIN(min_time_delta, 1000);
-
-        // TODO there is a bug where if the minimum timestamp is not a frequency that
-        // can be represented as an integer, the files will not render correctly as
-        // there are timing errors. Just locking to 200Hz on each channel
-        frequency_hz = 200;
-        min_time_delta = 5;
 
         // get good scalers for this data. This is acomplished by first scaling the data to 8*10^x
         // (0.008, 0.8, 80, 8000, ect) base on what is closest, then get a good *10^x exponent to
         // scale the data to 2^23, the size of a float mantissa. This should garuntee precision is
         // kept as long as the numbers are not too large
+        double scaler_float;
+        S16 offset_s16;
+        S16 scaler_s16;
+        S16 divisor_s16;
+        S16 base10_shift_s16;
 
         // TODO fix this scaling math to be less janky. Currently there are issues when
         // small numbers (ex: states) are scaled up to really big numbers and precision
         // is often put in the wrong place because of base10 in floating point
-
-        double scaling_value = MAX(abs(data_max), abs(data_min)); // scale using the largest ABS
-
+        double scaling_value = MAX(fabs(data_max), fabs(data_min)); // scale using the largest ABS
         S16 exp;
         bool done = false;
+
+        // if the two data points are equal, just set the scaler to 1
+        if (data_max - data_min <= 0.001)
+        {
+            exp = 0;
+            scaling_value = 1;
+            scaler_float = (8.0*pow(10, exp)) / (scaling_value);
+            // set the base10 shifter to range the data to a max of 8*10^6 (approx 2^23)
+            base10_shift_s16 = (6 - exp);
+            done = true;
+        }
+
         for (exp = -37; exp < 37 && !done; exp++)
         {
-            // if the two data points are equal, just set the scaler to 1
-            if (data_max - data_min <= 0.0001)
-            {
-                exp = 0;
-                scaling_value = 1;
-                scaler_float = (8.0*pow(10, exp)) / (scaling_value);
-
-                // set the base10 shifter to range the data to a max of 8*10^6 (approx 2^23)
-                base10_shift_s16 = (6 - exp);
-                done = true;
-            }
             // see if 8*10^exp is the right representation
-            else if (scaling_value >= 8.0*pow(10, exp) && scaling_value < 8.0*pow(10, exp+1))
+            if (scaling_value >= 8.0*pow(10, exp) && scaling_value < 8.0*pow(10, exp+1))
             {
                 // if it is, find the scaler to get the data from a range maxing at 8*10^exp
                 scaler_float = (8.0*pow(10, exp)) / (scaling_value);
-
                 // set the base10 shifter to range the data to a max of 8*10^6 (approx 2^23)
                 base10_shift_s16 = (6 - exp);
                 done = true;
             }
         }
+
         if (!done)
         {
             printf("Param %u has data that cannot be represented\n", curr_gdat->channel.gcan_id);
+            printf("Scaling Value: %f\n", scaling_value);
             printf("Data min: %f\n", data_min);
             printf("Data max: %f\n", data_max);
             curr_gdat = curr_gdat->next;
             continue;
         }
-
         // take the float scaler and turn it into a fraction (s16/s16). It is ok if the fraction
         // is not perfect, data will still be correct but with slightly less accuracy
         offset_s16 = 0;
         convert_float_to_frac(scaler_float, &scaler_s16, &divisor_s16);
 
+
         // create a new buffer with enought points to fill between time=0 to time=max
         // at a frequency that is close to the max frequency the data was logged
-        ld_data_points = curr_gdat->channel.timestamps[curr_gdat->channel.num_data_points - 1] / min_time_delta;
+        ld_data_points = curr_gdat->channel.timestamps[curr_gdat->channel.num_data_points - 1] / time_delta_ms;
         ld_buf = (U32*)malloc(sizeof(U32) * ld_data_points);
         if (!ld_buf)
         {
@@ -453,7 +462,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             return -1;
         }
 
-        // TODO not sure why this is here. Maybe only 12bits are actually used?
+        // not sure why this is here. Maybe only 12bits are actually used? Seems to be needed though
         divisor_s16 >>= 4;
         scaler_s16 >>= 4;
 
@@ -482,7 +491,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
                     *curr_ld_buf = (U32)(((float)divisor_s16 / scaler_s16) * *curr_data * pow(10, base10_shift_s16));
 
                     curr_ld_buf++;
-                    rolling_ts += min_time_delta;
+                    rolling_ts += time_delta_ms;
                 }
             }
             else
@@ -503,7 +512,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
                 *curr_ld_buf = (U32)(((float)divisor_s16 / scaler_s16) * interp_data * pow(10, base10_shift_s16));
 
                 curr_ld_buf++;
-                rolling_ts += min_time_delta;
+                rolling_ts += time_delta_ms;
             }
         }
 
@@ -523,8 +532,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             printf("\tdata max: %f\n", data_max);
             printf("\tdata min: %f\n", data_min);
             printf("\tmax time: %u\n", max_time);
-            printf("\tdelta_t max (ms): %u\n", max_time_delta);
-            printf("\tdelta_t min (ms): %u\n", min_time_delta);
+            printf("\tdelta_t (ms): %u\n", time_delta_ms);
             printf("\toffset: %d\n", offset_s16);
             printf("\tscaler: %d\n", scaler_s16);
             printf("\tdivisor: %d\n", divisor_s16);
