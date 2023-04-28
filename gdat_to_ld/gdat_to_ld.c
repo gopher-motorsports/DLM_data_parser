@@ -15,7 +15,7 @@
 #include <float.h>
 #include <math.h>
 
-#define MAX_TIME_STEP 1000
+#define MAX_TIME_STEP_ms 100
 
 // define everything that is neede in static memory
 START_OF_FILE_t sof_data = {0};
@@ -334,7 +334,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
 
     U32* ld_buf;
     U32 ld_data_points;
-    U32 delta_list[MAX_TIME_STEP+1] = {0};
+    U32 delta_list[MAX_TIME_STEP_ms+1] = {0};
 
     // the channel cant hold strings this long, but strncpy will append
     char chan_name[MAX_STR_SIZE];
@@ -365,7 +365,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
             if (curr_ts != curr_gdat->channel.timestamps)
             {
                 this_delta = *curr_ts - *(curr_ts - 1);
-                if (this_delta <= MAX_TIME_STEP)
+                if (this_delta <= MAX_TIME_STEP_ms)
                 {
                     delta_list[this_delta]++;
                 }
@@ -378,9 +378,9 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
 
         // find the most common time delta
         max_num_of_deltas = 0;
-        time_delta_ms = MAX_TIME_STEP;
+        time_delta_ms = MAX_TIME_STEP_ms;
         frequency_hz = 1;
-        for (U32 c = 1; c <= MAX_TIME_STEP; c++) // skip a delta of 0ms
+        for (U32 c = 1; c <= MAX_TIME_STEP_ms; c++) // skip a delta of 0ms
         {
             if (delta_list[c] > max_num_of_deltas)
             {
