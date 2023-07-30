@@ -49,6 +49,7 @@ int main(int argc, char** argv)
     char* in_filename; // will be argv[1]
     char out_filename[MAX_FILENAME_SIZE];
     FILE* in_file;
+    bool print_debug_output = false;
 
     // check to make sure a filename was inputted. If so create the output
     // filname based on it
@@ -69,6 +70,12 @@ int main(int argc, char** argv)
         printf("Failed to open file: %s\n", in_filename);
         return -1;
     }
+
+    // use the -d flag to print debugging outputs
+    if (argc >= 3)
+    {
+        print_debug_output = !strncmp(argv[2], "-d", MAX_STR_SIZE);
+    }
     
     // fill in all of the names and metadata for the ld file. This includes the
     // date and time from the gdat file, as well as event name, session, comments,
@@ -79,7 +86,7 @@ int main(int argc, char** argv)
     // read in the gdat file and store all the data in ram with some linked
     // lists for all of the data nodes
     printf("\nImporting data from the file...\n");
-    if (import_gdat(in_file, &gdat_data_head, false));
+    if (import_gdat(in_file, &gdat_data_head, print_debug_output));
 
     fclose(in_file);
 
@@ -88,7 +95,7 @@ int main(int argc, char** argv)
     // fancy math to figure out what the offset, scaler, divisor, and base10_shift
     // should be. Also find the logging frequency and give stats about the channel
     printf("\nConverting data to ld file format...\n");
-    if (build_ld_data_channels(&gdat_data_head, &channel_head, false));
+    if (build_ld_data_channels(&gdat_data_head, &channel_head, print_debug_output));
 
     // Run the "linker". This will fill out correct file space for all of the different
     // blocks of data and makes sure they will be correctly pointed to in the file
@@ -401,6 +408,7 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         // scale the data to 2^23, the size of a float mantissa. This should garuntee precision is
         // kept as long as the numbers are not too large
         double scaler_float;
+        double max_mag;
         S16 offset_s16;
         S16 scaler_s16;
         S16 divisor_s16;
@@ -413,11 +421,24 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         S16 exp;
         bool done = false;
 
-        // if the two data points are equal, just set the scaler to 1
+        // if the two data points are equal, just set the scaler to the max value. If all of the points
+        // are zero, set the scaler to 1
         if (data_max - data_min <= 0.001)
         {
-            exp = 0;
-            scaling_value = 1;
+            // we want to use the max magnitude for the best scaling
+            if (fabs(data_min) > fabs(data_max)) max_mag = data_min;
+            else max_mag = data_max;
+
+            if (max_mag <= 0.0001 && max_mag >= -0.0001)
+            {
+                exp = 0;
+                scaling_value = 1;
+            }
+            else
+            {
+                exp = 1;
+                scaling_value = max_mag;
+            }
             scaler_float = (8.0*pow(10, exp)) / (scaling_value);
             // set the base10 shifter to range the data to a max of 8*10^6 (approx 2^23)
             base10_shift_s16 = (6 - exp);
@@ -449,8 +470,11 @@ S8 build_ld_data_channels(GDAT_CHANNEL_LL_NODE_t* gdat_head, CHANNEL_DESC_LL_NOD
         // take the float scaler and turn it into a fraction (s16/s16). It is ok if the fraction
         // is not perfect, data will still be correct but with slightly less accuracy
         offset_s16 = 0;
-        convert_float_to_frac(scaler_float, &scaler_s16, &divisor_s16);
-
+        if (convert_float_to_frac(scaler_float, &scaler_s16, &divisor_s16) == -1.0)
+        {
+            // the algorithm failed
+            if (print_chan_stats) printf("Failed to convert channel %u!\n", curr_gdat->channel.gcan_id);
+        }
 
         // create a new buffer with enought points to fill between time=0 to time=max
         // at a frequency that is close to the max frequency the data was logged
