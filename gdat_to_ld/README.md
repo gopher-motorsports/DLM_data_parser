@@ -2,7 +2,7 @@ Requirements:
 - Install Windows Subsystem for Linux (WSL)
 - Build GopherCAN and Gopher Sense for a vehicle configuration
   - If you haven't done that before use this guide to install the needed packages https://docs.google.com/document/d/1cLWwNldL49tiXDKBKevhOdZic1N56Be6cRXwFWHZrO8/edit
-  - Then, simply build a module in STM32 Cube IDE
+  - Then either build a module configured for the car you want in STM32 Cube IDE, or run in gdat_to_ld run "python select_car.py [car config name ex. go4-23c]"
 
 1. Enter gdat_to_ld in WSL by navigating to it after opening WSL or by opening the location in command line and typing "wsl"
 2. Run ./ld_converter [path to gdat file location]
